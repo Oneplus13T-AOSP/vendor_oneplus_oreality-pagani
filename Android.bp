@@ -1,0 +1,101 @@
+//
+// Copyright (C) 2026 The LineageOS Project
+// SPDX-License-Identifier: Apache-2.0
+//
+// OnePlus 13T (pagani) OReality Audio + Holo Audio effect stack.
+//
+// Everything here is a prebuilt from the matching OxygenOS 17 dump except the
+// small control app. The effect libraries are loaded by the AIDL effects HAL
+// (libaudioeffecthal.qti) from /odm/lib64/soundfx.
+//
+
+soong_namespace {
+    imports: [
+        "vendor/oneplus/pagani",
+    ],
+}
+
+// Shared liboplus_audiox and libOplusSpatializerAidl are provided by the
+// imported vendor/oneplus/pagani namespace. Keep one module provider.
+
+// AudioX effect (OReality Audio). Implementation UUID
+// 41f6c0f4-5d8f-11ec-bf63-0242ac130002.
+cc_prebuilt_library_shared {
+    name: "libOplusAudioxAidl",
+    owner: "oneplus",
+    strip: {
+        none: true,
+    },
+    target: {
+        android_arm64: {
+            srcs: [
+                "proprietary/odm/lib64/soundfx/libOplusAudioxAidl.so",
+            ],
+            shared_libs: [
+                "libbase",
+                "libutils",
+                "libhidlbase",
+                "libbinder_ndk",
+                "libc",
+                "libc++_shared",
+                "libdl",
+                "liblog",
+                "libm",
+                "libfmq",
+                "libaudioutils",
+                "libcutils",
+                "liboplus_audiox",
+            ],
+        },
+    },
+    compile_multilib: "64",
+    relative_install_path: "soundfx",
+    prefer: true,
+    device_specific: true,
+}
+
+// Effects HAL configuration. Installed as /odm/etc/audio_effects_config.xml.
+//
+// libaudioeffecthal.qti resolves the file with
+// audio_find_readable_configuration_file("audio_effects_config.xml"), which
+// searches /odm/etc first, then /vendor/etc/audio/sku_<sku>, /vendor/etc and
+// /system/etc. Installing to /odm/etc therefore supersedes the stock
+// /vendor/etc/audio/sku_sun/audio_effects_config.xml from sm8750-common
+// without editing that file or the common tree.
+//
+// prebuilt_etc maps device_specific to the /odm partition.
+prebuilt_etc {
+    name: "oreality_audio_effects_config.xml",
+    src: "configs/audio/audio_effects_config.xml",
+    filename: "audio_effects_config.xml",
+    sub_dir: "etc",
+    device_specific: true,
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-oreality.xml",
+    src: "configs/permissions/privapp-permissions-oreality.xml",
+    sub_dir: "permissions",
+    system: true,
+}
+
+// Single platform-signed app that provides both Settings entries:
+//   OReality Audio  (com.android.settings.category.ia.sound, order -95)
+//   Holo Audio      (same category, order -94)
+// It owns the persistent AudioEffect handles so the chosen profile survives
+// audioserver restarts and app switching.
+android_app {
+    name: "ORealityControl",
+
+    srcs: ["packages/ORealityControl/src/**/*.java"],
+    resource_dirs: ["packages/ORealityControl/res"],
+    manifest: "packages/ORealityControl/AndroidManifest.xml",
+
+    certificate: "platform",
+    platform_apis: true,
+    privileged: true,
+
+    optimize: {
+        enabled: true,
+    },
+}

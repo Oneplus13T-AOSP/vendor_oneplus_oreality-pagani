@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <string name="oreality_title">OReality Audio</string>
+    <string name="oreality_summary">OnePlus spatial audio with music, movie and game profiles</string>
+    <string name="oreality_keywords">oreality, audio, sound, spatial, equalizer, oneplus</string>
+    <string name="oreality_enable">Use OReality Audio</string>
+    <string name="oreality_enable_summary">Apply the OnePlus audio engine to media playback</string>
+    <string name="oreality_profile">Sound profile</string>
+    <string name="oreality_equalizer">Graphic equalizer</string>
+    <string name="oreality_equalizer_summary">Adjust the ten frequency bands of the custom profile</string>
+    <string name="oreality_equalizer_bands">Equalizer</string>
+    <string name="oreality_equalizer_help">Gains are applied by the OnePlus audio engine. The speaker tuning table follows the current media volume.</string>
+    <string name="oreality_equalizer_reset">Reset all bands</string>
+    <string name="oreality_unavailable">The audio engine did not accept the change</string>
+
+    <string name="profile_music">Music</string>
+    <string name="profile_movie">Movie</string>
+    <string name="profile_game">Game</string>
+    <string name="profile_custom">Custom</string>
+
+    <string name="holo_title">Holo Audio</string>
+    <string name="holo_summary">Place every playing app in a virtual room</string>
+    <string name="holo_keywords">holo, audio, spatial, spatializer, oneplus</string>
+    <string name="holo_enable">Use Holo Audio</string>
+    <string name="holo_enable_summary">Render media through the OnePlus spatializer</string>
+    <string name="holo_level">Spatialization</string>
+    <string name="holo_device">Output device</string>
+    <string name="holo_device_ready">Ready for the current output</string>
+    <string name="holo_device_unavailable">Not supported for the current output</string>
+    <string name="holo_placement">Per-app placement</string>
+    <string name="holo_placement_pending">Needs the OnePlus MetaAudio services, which are not installed by this port</string>
+    <string name="holo_placement_unavailable">Unavailable: the OnePlus MetaAudio services are not installed</string>
+    <string name="holo_unsupported">The spatializer effect is not loaded</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+    ORealityControl is /system/priv-app. The privileged permission allowlist
+    must therefore live on /system, which is what system: true selects.
+-->
+<permissions>
+    <privapp-permissions package="com.oplus.oreality.audio">
+        <!-- Create/own the AudioX and spatializer effects on the global mix. -->
+        <permission name="android.permission.MODIFY_AUDIO_ROUTING" />
+        <!-- android.media.Spatializer setEnabled/setEffectParameter. -->
+        <permission name="android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS" />
+        <!-- Persist the selected profile across users and boots. -->
+        <permission name="android.permission.WRITE_SECURE_SETTINGS" />
+        <!-- Observe the per-user profile that the service restores. -->
+        <permission name="android.permission.INTERACT_ACROSS_USERS" />
+    </privapp-permissions>
+</permissions>

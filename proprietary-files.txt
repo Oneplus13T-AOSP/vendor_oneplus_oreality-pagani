@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OnePlus 13T (pagani) ColorOS 17 OReality Audio + Holo Audio inputs.
+#
+# Format matches LineageOS extract-utils:
+#   source path (in the dump) [: destination path] [-SHA1]
+# The script that maintains this file is extract-files.py.
+#
+# All binaries are pinned by SHA-256 in proprietary-files.sha256sum.
+
+# AudioX engine and effects
+odm/lib64/liboplus_audiox.so
+odm/lib64/soundfx/libOplusAudioxAidl.so
+odm/lib64/soundfx/libOplusSpatializerAidl.so
+
+# AudioX tuning (7 headphone + 40 speaker profiles)
+odm/etc/audio/audiox_param/HP_COMMON.bin
+odm/etc/audio/audiox_param/HP_GAME1.bin
+odm/etc/audio/audiox_param/HP_GAME2.bin
+odm/etc/audio/audiox_param/HP_MOVIE.bin
+odm/etc/audio/audiox_param/HP_MOVIE2.bin
+odm/etc/audio/audiox_param/HP_MUSIC.bin
+odm/etc/audio/audiox_param/HP_VOICE.bin
+odm/etc/audio/audiox_param/SPK_COMMON_lvl1.bin
+odm/etc/audio/audiox_param/SPK_COMMON_lvl2.bin
+odm/etc/audio/audiox_param/SPK_COMMON_lvl3.bin
+odm/etc/audio/audiox_param/SPK_COMMON_lvl4.bin
+odm/etc/audio/audiox_param/SPK_COMMON_lvl5.bin
+odm/etc/audio/audiox_param/SPK_GAME1_lvl1.bin
+odm/etc/audio/audiox_param/SPK_GAME1_lvl2.bin
+odm/etc/audio/audiox_param/SPK_GAME1_lvl3.bin
+odm/etc/audio/audiox_param/SPK_GAME1_lvl4.bin
+odm/etc/audio/audiox_param/SPK_GAME1_lvl5.bin
+odm/etc/audio/audiox_param/SPK_GAME2_lvl1.bin
+odm/etc/audio/audiox_param/SPK_GAME2_lvl2.bin
+odm/etc/audio/audiox_param/SPK_GAME2_lvl3.bin
+odm/etc/audio/audiox_param/SPK_GAME2_lvl4.bin
+odm/etc/audio/audiox_param/SPK_GAME2_lvl5.bin
+odm/etc/audio/audiox_param/SPK_MOVIE2_lvl1.bin
+odm/etc/audio/audiox_param/SPK_MOVIE2_lvl2.bin
+odm/etc/audio/audiox_param/SPK_MOVIE2_lvl3.bin
+odm/etc/audio/audiox_param/SPK_MOVIE2_lvl4.bin
+odm/etc/audio/audiox_param/SPK_MOVIE2_lvl5.bin
+odm/etc/audio/audiox_param/SPK_MOVIE3_lvl1.bin
+odm/etc/audio/audiox_param/SPK_MOVIE3_lvl2.bin
+odm/etc/audio/audiox_param/SPK_MOVIE3_lvl3.bin
+odm/etc/audio/audiox_param/SPK_MOVIE3_lvl4.bin
+odm/etc/audio/audiox_param/SPK_MOVIE3_lvl5.bin
+odm/etc/audio/audiox_param/SPK_MOVIE_lvl1.bin
+odm/etc/audio/audiox_param/SPK_MOVIE_lvl2.bin
+odm/etc/audio/audiox_param/SPK_MOVIE_lvl3.bin
+odm/etc/audio/audiox_param/SPK_MOVIE_lvl4.bin
+odm/etc/audio/audiox_param/SPK_MOVIE_lvl5.bin
+odm/etc/audio/audiox_param/SPK_MUSIC_lvl1.bin
+odm/etc/audio/audiox_param/SPK_MUSIC_lvl2.bin
+odm/etc/audio/audiox_param/SPK_MUSIC_lvl3.bin
+odm/etc/audio/audiox_param/SPK_MUSIC_lvl4.bin
+odm/etc/audio/audiox_param/SPK_MUSIC_lvl5.bin
+odm/etc/audio/audiox_param/SPK_VOICE_lvl1.bin
+odm/etc/audio/audiox_param/SPK_VOICE_lvl2.bin
+odm/etc/audio/audiox_param/SPK_VOICE_lvl3.bin
+odm/etc/audio/audiox_param/SPK_VOICE_lvl4.bin
+odm/etc/audio/audiox_param/SPK_VOICE_lvl5.bin
+
+# Spatializer (Holo Audio) tuning
+odm/etc/spatializer/HP_MOVIE_ANALOG.bin
+odm/etc/spatializer/HP_MOVIE_BLUETOOTH.bin
+odm/etc/spatializer/HP_MOVIE_DIGITAL.bin
+odm/etc/spatializer/HP_MOVIE_GALILEO.bin
+odm/etc/spatializer/HP_MUSIC_ANALOG.bin
+odm/etc/spatializer/HP_MUSIC_BLUETOOTH.bin
+odm/etc/spatializer/HP_MUSIC_DIGITAL.bin
+odm/etc/spatializer/HP_MUSIC_GALILEO.bin
+odm/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MOVIE.bin
+odm/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MOVIE_SPK.bin
+odm/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MUSIC.bin
+odm/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MUSIC_SPK.bin
+odm/etc/spatializer/SPK_MOVIE_lvl1.bin
+odm/etc/spatializer/SPK_MOVIE_lvl2.bin
+odm/etc/spatializer/SPK_MOVIE_lvl3.bin
+odm/etc/spatializer/SPK_MOVIE_lvl4.bin
+odm/etc/spatializer/SPK_MOVIE_lvl5.bin
+odm/etc/spatializer/SPK_MOVIE_lvl6.bin
+odm/etc/spatializer/SPK_MOVIE_lvl7.bin
+odm/etc/spatializer/SPK_MOVIE_lvl8.bin
+odm/etc/spatializer/SPK_MOVIE_lvl9.bin
+odm/etc/spatializer/SPK_MOVIE_lvl10.bin

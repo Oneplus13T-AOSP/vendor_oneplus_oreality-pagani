@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <string name="oreality_title">오리얼리티 오디오</string>
+    <string name="oreality_summary">음악·영화·게임 프로파일을 갖춘 원플러스 공간 음향</string>
+    <string name="oreality_keywords">오리얼리티, 오디오, 소리, 공간음향, 이퀄라이저, 원플러스</string>
+    <string name="oreality_enable">오리얼리티 오디오 사용</string>
+    <string name="oreality_enable_summary">원플러스 오디오 엔진을 미디어 재생에 적용합니다</string>
+    <string name="oreality_profile">사운드 프로파일</string>
+    <string name="oreality_equalizer">그래픽 이퀄라이저</string>
+    <string name="oreality_equalizer_summary">사용자 프로파일의 10개 주파수 대역을 조정합니다</string>
+    <string name="oreality_equalizer_bands">이퀄라이저</string>
+    <string name="oreality_equalizer_help">이득은 원플러스 오디오 엔진이 적용합니다. 스피커 튜닝 표는 현재 미디어 볼륨을 따릅니다.</string>
+    <string name="oreality_equalizer_reset">모든 대역 초기화</string>
+    <string name="oreality_unavailable">오디오 엔진이 변경을 적용하지 못했습니다</string>
+
+    <string name="profile_music">음악</string>
+    <string name="profile_movie">영화</string>
+    <string name="profile_game">게임</string>
+    <string name="profile_custom">사용자 지정</string>
+
+    <string name="holo_title">홀로 오디오</string>
+    <string name="holo_summary">재생 중인 앱마다 가상 공간의 위치를 지정합니다</string>
+    <string name="holo_keywords">홀로, 오디오, 공간음향, 스피셜라이저, 원플러스</string>
+    <string name="holo_enable">홀로 오디오 사용</string>
+    <string name="holo_enable_summary">미디어를 원플러스 공간화 엔진으로 렌더링합니다</string>
+    <string name="holo_level">공간화</string>
+    <string name="holo_device">출력 기기</string>
+    <string name="holo_device_ready">현재 출력에 사용할 수 있습니다</string>
+    <string name="holo_device_unavailable">현재 출력에서는 지원되지 않습니다</string>
+    <string name="holo_placement">앱별 위치 지정</string>
+    <string name="holo_placement_pending">이 포팅에 포함되지 않은 원플러스 메타오디오 서비스가 필요합니다</string>
+    <string name="holo_placement_unavailable">사용할 수 없음: 원플러스 메타오디오 서비스가 설치되어 있지 않습니다</string>
+    <string name="holo_unsupported">공간화 효과가 로드되지 않았습니다</string>
+</resources>

@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Built from the pinned stock inputs. Regenerate with extract-files.py.
+/proprietary/
+__pycache__/
+*.pyc

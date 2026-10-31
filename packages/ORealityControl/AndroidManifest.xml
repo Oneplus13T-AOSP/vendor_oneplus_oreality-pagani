@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.oplus.oreality.audio">
+
+    <!-- Own the AudioX and spatializer effects on the global output mix. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
+    <!-- android.media.Spatializer setEnabled/setEffectParameter. -->
+    <uses-permission android:name="android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS" />
+    <!-- Persist the profile across users, and read the current one back. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="false"
+        android:defaultToDeviceProtectedStorage="true"
+        android:directBootAware="true"
+        android:icon="@drawable/ic_oreality"
+        android:label="@string/oreality_title"
+        android:persistent="true"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Settings">
+
+        <!-- Settings > Sound & vibration: OReality Audio. -->
+        <activity
+            android:name=".ORealitySettingsActivity"
+            android:exported="true"
+            android:label="@string/oreality_title">
+            <intent-filter>
+                <action android:name="com.android.settings.action.IA_SETTINGS" />
+            </intent-filter>
+            <meta-data
+                android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.sound" />
+            <meta-data
+                android:name="com.android.settings.title"
+                android:resource="@string/oreality_title" />
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/oreality_summary" />
+            <meta-data
+                android:name="com.android.settings.keywords"
+                android:resource="@string/oreality_keywords" />
+            <meta-data
+                android:name="com.android.settings.order"
+                android:value="-95" />
+        </activity>
+
+        <!-- Settings > Sound & vibration: Holo Audio, below OReality. -->
+        <activity
+            android:name=".HoloAudioSettingsActivity"
+            android:exported="true"
+            android:label="@string/holo_title">
+            <intent-filter>
+                <action android:name="com.android.settings.action.IA_SETTINGS" />
+            </intent-filter>
+            <meta-data
+                android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.sound" />
+            <meta-data
+                android:name="com.android.settings.title"
+                android:resource="@string/holo_title" />
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/holo_summary" />
+            <meta-data
+                android:name="com.android.settings.keywords"
+                android:resource="@string/holo_keywords" />
+            <meta-data
+                android:name="com.android.settings.order"
+                android:value="-94" />
+        </activity>
+
+        <activity
+            android:name=".EqualizerActivity"
+            android:exported="false"
+            android:label="@string/oreality_equalizer_bands" />
+
+        <!-- Persistent owner of both AudioEffect handles. -->
+        <service
+            android:name=".EffectService"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:directBootAware="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
