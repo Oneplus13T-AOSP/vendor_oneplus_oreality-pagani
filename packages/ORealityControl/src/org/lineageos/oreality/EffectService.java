@@ -29,9 +29,6 @@ import android.util.Log;
 public final class EffectService extends Service {
     private static final String TAG = "ORealityService";
 
-    static final String ACTION_STATE_CHANGED =
-            "org.lineageos.oreality.action.STATE_CHANGED";
-
     private static EffectService sInstance;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
@@ -47,7 +44,11 @@ public final class EffectService extends Service {
     }
 
     static void start(Context context) {
-        context.startService(new Intent(context, EffectService.class));
+        try {
+            context.startService(new Intent(context, EffectService.class));
+        } catch (IllegalStateException | SecurityException unavailable) {
+            Log.w(TAG, "cannot start the effect service", unavailable);
+        }
     }
 
     private final BroadcastReceiver mNoisyReceiver = new BroadcastReceiver() {
@@ -113,7 +114,6 @@ public final class EffectService extends Service {
             }
         }
         applyState();
-        notifyChanged();
     }
 
     /** Applies the persisted selection to whichever effects are alive. */
@@ -158,7 +158,6 @@ public final class EffectService extends Service {
         mPrefs.setRealityEnabled(enabled);
         boolean accepted = mAudioX == null
                 || mAudioX.setEnabled(enabled) == android.media.audiofx.AudioEffect.SUCCESS;
-        notifyChanged();
         return accepted;
     }
 
@@ -168,7 +167,6 @@ public final class EffectService extends Service {
         if (mHolo.isSupported()) {
             mHolo.setProfile(profile);
         }
-        notifyChanged();
         return accepted;
     }
 
@@ -198,7 +196,6 @@ public final class EffectService extends Service {
         boolean accepted = mAudioX == null
                 || mAudioX.setEqualizer(mPrefs.isEqualizerEnabled(),
                         mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains());
-        notifyChanged();
         return accepted;
     }
 
@@ -217,7 +214,6 @@ public final class EffectService extends Service {
     boolean setHoloEnabled(boolean enabled) {
         mPrefs.setHoloEnabled(enabled);
         mHolo.setEnabled(enabled);
-        notifyChanged();
         return true;
     }
 
@@ -229,9 +225,5 @@ public final class EffectService extends Service {
         // The spatializer expects the DisplayManager rotation, which is already
         // expressed in quarter turns (0, 1, 2, 3).
         return getDisplay() == null ? 0 : getDisplay().getRotation();
-    }
-
-    private void notifyChanged() {
-        sendBroadcast(new Intent(ACTION_STATE_CHANGED).setPackage(getPackageName()));
     }
 }

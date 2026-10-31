@@ -63,12 +63,12 @@ cc_prebuilt_library_shared {
 // /vendor/etc/audio/sku_sun/audio_effects_config.xml from sm8750-common
 // without editing that file or the common tree.
 //
-// prebuilt_etc maps device_specific to the /odm partition.
+// prebuilt_etc always installs under <partition>/etc, so sub_dir must not
+// repeat "etc": sub_dir is appended to the module's base directory.
 prebuilt_etc {
     name: "oreality_audio_effects_config.xml",
     src: "configs/audio/audio_effects_config.xml",
     filename: "audio_effects_config.xml",
-    sub_dir: "etc",
     device_specific: true,
 }
 

@@ -33,18 +33,21 @@ public final class BootReceiver extends BroadcastReceiver {
             case Intent.ACTION_MY_PACKAGE_REPLACED:
                 EffectService.start(context);
                 break;
-            case AudioManager.ACTION_AUDIO_BECOMING_NOISY:
-                // Debounce: several noisy broadcasts can arrive together.
+            case AudioManager.ACTION_AUDIO_BECOMING_NOISY: {
+                // Debounce: several noisy broadcasts can arrive together. The
+                // service also listens for this event, so only ask for a rebind
+                // when it is already running; starting it would be a no-op
+                // otherwise and the service recreates its effect in onCreate.
                 long now = SystemClock.elapsedRealtime();
                 if (now - sLastRestart >= MIN_RESTART_INTERVAL_MS) {
                     sLastRestart = now;
-                    EffectService.start(context);
                     EffectService service = EffectService.peek();
                     if (service != null) {
                         service.rebind(true);
                     }
                 }
                 break;
+            }
             default:
                 break;
         }

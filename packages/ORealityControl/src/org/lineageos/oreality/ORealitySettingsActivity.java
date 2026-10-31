@@ -58,12 +58,17 @@ public final class ORealitySettingsActivity extends PreferenceActivity {
         mProfile.setTitle(R.string.oreality_profile);
         mProfile.setPersistent(false);
         mProfile.setEntries(new CharSequence[] {
-                getString(R.string.profile_music), getString(R.string.profile_movie),
-                getString(R.string.profile_game), getString(R.string.profile_custom)});
+                getString(R.string.profile_intelligence), getString(R.string.profile_music),
+                getString(R.string.profile_movie), getString(R.string.profile_game),
+                getString(R.string.profile_immersion), getString(R.string.profile_fidelity),
+                getString(R.string.profile_custom)});
         mProfile.setEntryValues(new CharSequence[] {
+                Integer.toString(AudioXEffect.PROFILE_INTELLIGENCE),
                 Integer.toString(AudioXEffect.PROFILE_MUSIC),
                 Integer.toString(AudioXEffect.PROFILE_MOVIE),
                 Integer.toString(AudioXEffect.PROFILE_GAME),
+                Integer.toString(AudioXEffect.PROFILE_IMMERSION),
+                Integer.toString(AudioXEffect.PROFILE_FIDELITY),
                 Integer.toString(AudioXEffect.PROFILE_CUSTOM)});
         mProfile.setOnPreferenceChangeListener((preference, value) -> {
             try {

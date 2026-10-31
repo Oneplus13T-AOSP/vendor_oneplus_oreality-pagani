@@ -25,7 +25,6 @@ final class Prefs {
     private static final String KEY_HOLO_ENABLED = "holo_enabled";
 
     static final int DEFAULT_PROFILE = AudioXEffect.PROFILE_MUSIC;
-
     private final SharedPreferences mPrefs;
 
     Prefs(Context context) {

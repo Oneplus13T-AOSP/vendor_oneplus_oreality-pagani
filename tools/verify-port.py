@@ -295,6 +295,91 @@ def check_permissions(rom_root: Path) -> None:
     print(f"  allowlist grants {len(granted)} permission(s)")
 
 
+def check_build_rules() -> None:
+    """Catch the Soong install-path traps that keep the config from loading."""
+    bp = (REPO / "Android.bp").read_text(encoding="utf-8")
+
+    # prebuilt_etc installs under <partition>/etc, so a sub_dir of "etc" would
+    # produce /odm/etc/etc/audio_effects_config.xml.
+    for block in bp.split("prebuilt_etc {"):
+        if "oreality_audio_effects_config.xml" not in block:
+            continue
+        header = block.split("}", 1)[0]
+        if 'sub_dir: "etc"' in header:
+            fail("oreality_audio_effects_config.xml sets sub_dir \"etc\"; "
+                 "prebuilt_etc appends sub_dir to <partition>/etc, so the file "
+                 "would land in /odm/etc/etc and the HAL would not find it")
+        if "device_specific: true" not in header:
+            fail("oreality_audio_effects_config.xml must be device_specific "
+                 "so it installs on /odm")
+        break
+    else:
+        fail("prebuilt_etc oreality_audio_effects_config.xml is missing")
+
+    # The allowlist must stay on the same partition as the app (/system).
+    for block in bp.split("prebuilt_etc {"):
+        if "privapp-permissions-oreality.xml" not in block:
+            continue
+        header = block.split("}", 1)[0]
+        if "system: true" not in header:
+            fail("privapp allowlist must be installed on /system")
+        if 'sub_dir: "permissions"' not in header:
+            fail("privapp allowlist must be installed under etc/permissions")
+        break
+
+    print("  build rules verified")
+
+
+def check_settings_entry() -> None:
+    """Settings only renders injected tiles matching com.android.settings.group_key."""
+    manifest = REPO / "packages/ORealityControl/AndroidManifest.xml"
+    try:
+        root = ET.parse(manifest).getroot()
+    except ET.ParseError as error:
+        fail(f"manifest is not well formed: {error}")
+        return
+
+    ns = "{http://schemas.android.com/apk/res/android}"
+    entries = 0
+    for activity in root.iter("activity"):
+        actions = {a.get(ns + "name") for a in activity.iter("action")}
+        if "com.android.settings.action.IA_SETTINGS" not in actions:
+            continue
+        entries += 1
+        meta = {m.get(ns + "name"): m for m in activity.iter("meta-data")}
+        if "com.android.settings.group_key" not in meta:
+            fail(f"{activity.get(ns + 'name')} has no com.android.settings.group_key; "
+                 "Settings hides injected tiles without it")
+        if "com.android.settings.category" not in meta:
+            fail(f"{activity.get(ns + 'name')} has no com.android.settings.category")
+        for required in ("com.android.settings.title",
+                         "com.android.settings.summary",
+                         "com.android.settings.order"):
+            if required not in meta:
+                fail(f"{activity.get(ns + 'name')} is missing {required}")
+
+    if entries < 2:
+        fail(f"expected two IA_SETTINGS entries, found {entries}")
+
+    print(f"  settings entries verified: {entries}")
+
+
+def check_profile_mapping() -> None:
+    """The public profile ids must be translated, not passed through.
+
+    Stock AudioxEffect maps public music (1) to engine slot 2; writing the raw
+    value would select the wrong profile.
+    """
+    source = (REPO / "packages/ORealityControl/src/org/lineageos/oreality"
+              "/AudioXEffect.java").read_text(encoding="utf-8")
+    if "case PROFILE_MUSIC:" not in source or "return 2;" not in source:
+        fail("AudioXEffect.mapProfile must translate PROFILE_MUSIC to engine slot 2")
+    if "4194304" not in source and "2, 22" not in source:
+        fail("AudioXEffect must scale EQ gains by 2^22 before writing them")
+
+    print("  profile mapping verified")
+
+
 def check_properties(rom_root: Path) -> None:
     """Both feature properties must be set by the device makefile."""
     makefile = REPO / "oreality.mk"
@@ -326,6 +411,9 @@ def main() -> int:
     check_dependencies(rom_root)
     check_hal_config(rom_root)
     check_permissions(rom_root)
+    check_build_rules()
+    check_settings_entry()
+    check_profile_mapping()
     check_properties(rom_root)
 
     for message in warnings:

@@ -48,13 +48,18 @@ final class AudioXEffect {
     /** Number of graphic-EQ bands the engine accepts. */
     static final int EQ_BANDS = 10;
 
-    /**
-     * Profiles accepted by {@link #setProfile(int)}. These are the stock
-     * AudioX profile indices; {@code 6} is the custom (user EQ) profile.
+    /*
+     * Public profile ids, exactly as stored in Settings.System
+     * "system_effect_profile" and shown by the stock OReality UI. These are NOT
+     * the values the engine receives: the stock AudioxEffect translates them
+     * before writing PARAM_PROFILE.
      */
-    static final int PROFILE_MUSIC = 2;
-    static final int PROFILE_MOVIE = 3;
-    static final int PROFILE_GAME = 4;
+    static final int PROFILE_INTELLIGENCE = 0;
+    static final int PROFILE_MUSIC = 1;
+    static final int PROFILE_MOVIE = 2;
+    static final int PROFILE_GAME = 3;
+    static final int PROFILE_IMMERSION = 4;
+    static final int PROFILE_FIDELITY = 5;
     static final int PROFILE_CUSTOM = 6;
 
     private static final Method SET_PARAM_BYTES = findMethod("setParameter",
@@ -103,15 +108,19 @@ final class AudioXEffect {
 
     /** Stock profile index, see the {@code PROFILE_*} constants. */
     boolean setProfile(int profile) {
-        if (!validProfile(profile)) {
+        int engine = mapProfile(profile);
+        if (engine < 0) {
             return false;
         }
-        return setInt(PARAM_PROFILE, mapProfile(profile));
+        return setInt(PARAM_PROFILE, engine);
     }
 
     /**
      * Sets the graphic EQ. {@code volumeIndex} selects the speaker tuning
      * table, so callers pass the current music stream index.
+     *
+     * <p>Gains are in millibels and are converted to the fixed-point format the
+     * engine consumes (Q22), matching the stock service.
      */
     boolean setEqualizer(boolean enabled, int volumeIndex, int[] millibels) {
         if (millibels == null || millibels.length != EQ_BANDS) {
@@ -124,7 +133,7 @@ final class AudioXEffect {
         writeInt(volumeIndex, payload, 0);
         writeInt(EQ_BANDS, payload, 4);
         for (int band = 0; band < EQ_BANDS; band++) {
-            writeInt(millibels[band], payload, 8 + band * 4);
+            writeInt(toEngineGain(millibels[band]), payload, 8 + band * 4);
         }
         return setBytes(PARAM_EQ_GAINS, payload);
     }
@@ -170,18 +179,47 @@ final class AudioXEffect {
         }
     }
 
-    private static boolean validProfile(int profile) {
-        return profile == PROFILE_MUSIC || profile == PROFILE_MOVIE
-                || profile == PROFILE_GAME || profile == PROFILE_CUSTOM;
+    /**
+     * Translates a public profile id to the index the effect expects.
+     *
+     * <p>Copied from the stock {@code AudioxEffect#setProfile}: every profile
+     * except music, movie, game and custom maps to the engine's default slot 6.
+     * The public music id 1 maps to engine slot 2, which is the trap this
+     * translation exists for.
+     *
+     * @return the engine index, or -1 when the id is not a known profile
+     */
+    private static int mapProfile(int profile) {
+        switch (profile) {
+            case PROFILE_MUSIC:
+                return 2;
+            case PROFILE_MOVIE:
+                return 3;
+            case PROFILE_GAME:
+                return 4;
+            case PROFILE_CUSTOM:
+                return 6;
+            case PROFILE_INTELLIGENCE:
+                return 6;
+            case PROFILE_IMMERSION:
+                return 4;
+            case PROFILE_FIDELITY:
+                return 5;
+            default:
+                return -1;
+        }
     }
 
     /**
-     * The stock class keeps the public profile number in {@code mProfile} and
-     * writes a translated engine index. Only the four profiles exposed here are
-     * translated; the identity mapping covers them.
+     * Converts millibels to the Q22 fixed-point value the AudioX engine reads.
+     *
+     * <p>The stock service stores the preset gains in
+     * {@code Settings.System} and then computes
+     * {@code (int) Math.floor(gain * Math.pow(2, 22))} before every write, so
+     * the engine never receives the raw value.
      */
-    private static int mapProfile(int profile) {
-        return profile;
+    private static int toEngineGain(int millibels) {
+        return (int) Math.floor(millibels * 4194304.0d);
     }
 
     private static byte[] intToBytes(int value) {

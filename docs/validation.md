@@ -15,6 +15,9 @@
 | 의존성 폐포 | 3개 라이브러리의 DT_NEEDED가 모두 제공됨 | 통과 |
 | HAL 설정 | `/odm/etc` 사본 설치 + 검색 순서 1순위 | 빌드 후 확인 |
 | 권한 allowlist | 선언한 특권 권한 전부 허용 | 통과 |
+| 빌드 규칙 | `prebuilt_etc` 설치 경로, allowlist 파티션 | 통과 |
+| Settings 노출 | 두 항목의 `IA_SETTINGS` + `group_key` | 통과 |
+| 프로파일 매핑 | 공개 id → 엔진 슬롯 변환 | 통과 |
 | 속성 | `ro.oplus.audio.effect.type`, `ro.audio.spatializer_enabled` | 통과 |
 
 추가로 확인한 사실:
@@ -49,6 +52,28 @@ python3 vendor/oneplus/oreality-pagani/tools/verify-port.py --rom-root /home/ccc
 3. `audio_config.h`의 검색 순서가 여전히 `/odm/etc`로 시작하는지
 
 `out/target/product/pagani`가 없으면 1~3은 경고로 남고 실패로 처리하지 않습니다.
+
+## 재검토에서 발견해 수정한 결함
+
+1. **`prebuilt_etc` 설치 경로** — `sub_dir: "etc"`를 지정해
+   `/odm/etc/etc/audio_effects_config.xml`로 설치될 상태였다. `prebuilt_etc`는
+   항상 `<partition>/etc` 아래에 설치하고 `sub_dir`를 그 하위 디렉터리로 붙이므로
+   `sub_dir`를 제거했다. 이 상태였다면 HAL이 설정을 찾지 못해 효과가 전혀
+   등록되지 않았다.
+2. **Settings 항목 미노출** — `com.android.settings.group_key`가 없었다.
+   PixelOS Settings의 `SystemCategoryController`는 이 키가 카테고리와 일치하는
+   타일만 렌더링하므로, 두 항목이 목록에 나타나지 않았을 것이다.
+3. **프로파일 값 매핑** — 공개 프로파일 id를 그대로 엔진에 썼다. 스톡
+   `AudioxEffect#setProfile`은 음악(1)을 엔진 슬롯 2로 변환한다. 그대로 쓰면
+   음악 프로파일이 다른 슬롯을 선택한다. 변환표를 추가하고, 스톡 UI가 노출하는
+   7개 프로파일(Smart/Music/Movie/Game/Immersion/Fidelity/Custom)로 목록을 맞췄다.
+4. **EQ 이득 스케일** — 밀리벨을 그대로 전송했다. 스톡 서비스는
+   `floor(gain * 2^22)`로 Q22 고정소수점 변환 후 전송한다. 변환을 추가했다.
+5. **죽은 코드/중복 복원** — `ACTION_STATE_CHANGED` 브로드캐스트는 수신자가
+   없었고, `BootReceiver`가 `AUDIO_BECOMING_NOISY`에서 서비스를 시작한 뒤
+   `rebind`까지 호출해 `onCreate`와 중복됐다. 브로드캐스트를 제거하고
+   수신자는 이미 실행 중인 서비스만 갱신하도록 정리했다.
+6. **서비스 시작 실패 처리** — `startService`가 던지는 예외를 잡지 않았다.
 
 ## 실기기에서만 확인 가능한 것
 

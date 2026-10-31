@@ -36,6 +36,12 @@
             <meta-data
                 android:name="com.android.settings.category"
                 android:value="com.android.settings.category.ia.sound" />
+            <!-- Settings only renders an injected tile whose group_key matches
+                 the category it is inserted into; without this the entry is
+                 invisible. -->
+            <meta-data
+                android:name="com.android.settings.group_key"
+                android:value="system_sounds_and_vibrations_category" />
             <meta-data
                 android:name="com.android.settings.title"
                 android:resource="@string/oreality_title" />
@@ -61,6 +67,9 @@
             <meta-data
                 android:name="com.android.settings.category"
                 android:value="com.android.settings.category.ia.sound" />
+            <meta-data
+                android:name="com.android.settings.group_key"
+                android:value="system_sounds_and_vibrations_category" />
             <meta-data
                 android:name="com.android.settings.title"
                 android:resource="@string/holo_title" />

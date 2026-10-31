@@ -24,6 +24,7 @@ import android.widget.TextView;
  * the stock COUI resources, which are not available to a platform app.
  */
 public final class EqualizerActivity extends Activity {
+    /** Engine range, in millibels: the stock OPlus equalizer uses +/-12 dB. */
     static final int MIN_GAIN = -1200;
     static final int MAX_GAIN = 1200;
     private static final String[] BANDS = {
