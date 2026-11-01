@@ -20,6 +20,12 @@ $(call inherit-product, vendor/oneplus/oreality-pagani/oreality.mk)
 endif
 ```
 
+**현행화된 pagani의 proprietary-files.txt로 `vendor/oneplus/pagani`를 재생성한 뒤
+함께 사용해야 합니다.** 기존 vendor 캐시는 공유 엔진 모듈이 없을 수 있습니다.
+이 저장소는 `liboplus_audiox`, `libOplusSpatializerAidl`을 정의하지 않고
+`vendor/oneplus/pagani` namespace에서 가져옵니다. 공간 음향 튜닝 20개도
+pagani가 설치하며, OReality는 AudioX 튜닝 47개와 추가 스피커 룸 모델 2개만 복사합니다.
+
 기존 디바이스 커밋 `d84ab49`에 이 통합이 들어 있습니다. 별도의 BoardConfig
 상속은 필요하지 않습니다. 공통 트리 수정 없이 `/odm/etc/audio_effects_config.xml`로
 기존 `/vendor/etc/audio/sku_sun/audio_effects_config.xml`을 우선합니다.
@@ -27,7 +33,9 @@ endif
 
 ```sh
 python3 vendor/oneplus/oreality-pagani/extract-files.py /path/to/pagani-dump
-python3 vendor/oneplus/oreality-pagani/tools/verify-port.py --rom-root "$PWD"
+python3 vendor/oneplus/oreality-pagani/tools/verify-port.py --rom-root "$PWD" \
+  --pagani-device-tree device/oneplus/pagani \
+  --pagani-vendor-tree vendor/oneplus/pagani
 python3 vendor/oneplus/oreality-pagani/tools/tests/test_extract.py
 ```
 
@@ -46,7 +54,12 @@ python3 vendor/oneplus/oreality-pagani/tools/tests/test_extract.py
 | HAL 설정 | `/odm/etc/audio_effects_config.xml` |
 | 제어 앱 / 권한 목록 | `/system/priv-app/ORealityControl`, `/system/etc/permissions/privapp-permissions-oreality.xml` |
 
-`libMNN`과 `libc++_shared`는 pagani vendor 트리의 `/odm/lib64` 제공본을 사용합니다.
+`liboplus_audiox`, `libOplusSpatializerAidl`, `libMNN`, `libc++_shared`와
+공간 음향 튜닝 20개는 pagani vendor 제공본을 사용합니다.
+설치 구성 표의 나머지 항목과 추가 스피커 룸 모델 2개는 OReality가 제공합니다.
+72개 원본·고정 해시 목록은 추출/검증용 스냅샷으로 유지하며 모두 설치하지는 않습니다.
+`libOplusSpatializerAidl`에 pagani 추출기가 적용하는 `libbase.so` 의존성 추가도
+생성 결과 검증에서 허용합니다.
 엔진 속성은 `PRODUCT_VENDOR_PROPERTIES`, 플랫폼 공간화 활성화 속성은
 `PRODUCT_SYSTEM_PROPERTIES`로 설정합니다. 지원하지 않는 MetaAudio 라우팅 기능을
 광고하는 속성은 추가하지 않습니다.

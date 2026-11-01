@@ -115,3 +115,106 @@ Settings 진입, 콜드 부팅 및 잠금 해제 전 복원, audioserver 복구,
 추가로 필요합니다. 해당 기능은 구현하지 않았습니다. Direct/Compress 경로의
 효과 적용 여부, 기본/몰입/선명 프로파일의 스톡 동등성, Bluetooth 전용 파라미터,
 CPU 부하는 실기기 검증 과제로 남습니다.
+
+## 추가 의존성·ABI·SELinux·권한 검토
+
+초기 커밋의 검증은 위의 정적 검사 범위이며 **메뉴 실행 오류를 모두 제거했다는
+의미가 아닙니다.** 추가로 아래를 확인했습니다.
+
+### 재귀 ELF 및 버전 심볼
+
+```sh
+python3 tools/audit-elf.py \
+  --rom-root /home/ccc/android/pixelos \
+  --platform-image /home/ccc/android/pixelos/out/target/product/nabu \
+  --reference-only
+```
+
+현재 pagani 출력이 없어 효과 3개와 pagani ODM 제공본(libMNN/libc++_shared),
+nabu에 빌드된 같은 PixelOS 플랫폼 라이브러리를 조합했습니다.
+재귀 방문 ELF 25개에서 DT_NEEDED 제공본 누락 0개, 강한 동적 심볼 및
+명시적 심볼 버전 불일치 0개였습니다. libc IFUNC도 검사에 포함했습니다.
+이 결과는 **참고 이미지 기반**이며 pagani 실제 설치/ABI 검증 완료가 아닙니다.
+
+검사기는 플랫폼 제공 경로를 출력하고, 다른 기기 산출물을 사용할 때는
+`--reference-only`를 요구합니다. pagani 출력에 대해서 실행하면 저장소의
+엔진 대신 실제 이미지의 `/odm/lib64` 엔진과 의존 파일을 검사합니다.
+C++ 객체 배치, 심볼 interposition, 실제 링커 네임스페이스, 런타임 dlopen은
+이 검사만으로 보장하지 않습니다.
+
+현재 common vendor가 사용하는 `libaudioeffecthal.qti.so`는 prebuilt이고,
+DT_NEEDED에 audio.effect-V2-ndk 및 audio.common.types-V3-ndk가 있습니다.
+현재 VINTF도 effect HAL version 2를 선언합니다. 효과 라이브러리가 자체 보유한
+NDK 인터페이스와 framework 사이의 실제 Binder 연결은 부팅 후 확인해야 합니다.
+
+### 링커 및 SELinux 소스 대조
+
+- Qualcomm 효과 라이브러리 검색 경로에 `/odm/lib64/soundfx`가 있습니다.
+  vendor default 네임스페이스는 `/odm/lib64`를 검색하며 `/odm`을 허용합니다.
+  효과를 로드하는 프로세스는 앱이 아닌 vendor 오디오 HAL입니다.
+- qcom sm8750 file_contexts는 `audiohalservice.qti`를
+  `hal_audio_default_exec`로 라벨링합니다.
+- 플랫폼 file_contexts에서 ODM 라이브러리는 `vendor_file`,
+  `/odm/etc` 튜닝/설정은 `vendor_configs_file`입니다. 확인한 qcom/OPlus
+  file_contexts에 이 포트의 해당 경로를 덮어쓰는 규칙은 없습니다.
+- 플랫폼 domain 정책은 vendor 도메인의 vendor_file_type 읽기/실행/map과
+  vendor_configs_file 읽기를 허용합니다. HAL의 선택적 audio dump 경로에는
+  qcom 정책의 vendor_audio_data_file 접근 규칙이 있습니다.
+- 앱은 플랫폼 서명 앱 도메인을 사용하고 JNI로 ODM 라이브러리를 직접 로드하지
+  않습니다. AOSP 앱 Binder 규칙과 오디오 서비스 API를 사용합니다.
+
+이 소스 대조에서 추가 allow 규칙이 반드시 필요한 접근은 확인되지 않았습니다.
+**pagani 정책 컴파일·실제 라벨·enforcing 상태의 AVC 무발생은 검증하지 않았습니다.**
+불필요한 광범위 allow나 permissive 도메인은 추가하지 않았습니다.
+
+### 권한과 메뉴 실행
+
+AudioService 구현에서 서버 상태 감시 권한은 MODIFY_AUDIO_ROUTING 또는
+MODIFY_PHONE_STATE이며 앱은 전자를 선언/허용합니다. Spatializer의 활성화,
+파라미터, 출력 콜백에는 MODIFY_DEFAULT_AUDIO_EFFECTS가 필요하며
+선언/allowlist에 있습니다. 앱과 allowlist는 모두 system에 설치되도록 구성했습니다.
+Manifest의 Activity/Service/Receiver 클래스는 Java 소스와 일치하고 Android 17
+API 대상으로 컴파일되었습니다. 화면에서 서비스 생성 전 접근하는 경로도 수정했습니다.
+
+이는 알려진 클래스 로딩·컨텍스트·서비스 연결 결함과 권한 요건을 정적으로 확인한
+것입니다. **설정 메뉴 탭 → 화면 실행 → 효과 생성 → 프로파일/EQ 변경이라는
+실제 기기 동작 테스트는 수행하지 않았습니다.** PackageManager의 최종 권한
+부여, AndroidRuntime 예외, AudioEffect 생성 실패, SELinux AVC는 실기기 로그로
+확인해야 합니다. 따라서 '모든 메뉴 실행 오류를 잡았다'고 판정하지 않습니다.
+
+
+## 현행화 pagani와의 공유 모듈 통합
+
+현행화된 디바이스 목록은 `liboplus_audiox`, `libOplusSpatializerAidl`과 공간 음향
+튜닝 20개를 생성합니다. 이전 포트와 함께 Make에 두 namespace를 공개하면
+모듈 중복과 설치 목적지 중복이 생겼습니다. 최초 포팅 커밋부터 OReality의 두
+중복 모듈 정의와 튜닝 복사 20개를 제거하는 방식으로 기존 4개 커밋을 리베이스했습니다.
+공유 모듈의 PRODUCT_PACKAGES 요청과 Soong namespace import는 유지합니다.
+OReality 전용 libOplusAudioxAidl·앱·권한·HAL 설정·AudioX 튜닝 47개 및 추가
+스피커 룸 모델 2개도 유지합니다. 스톡 72개 입력과 고정 해시는 변경하지 않았습니다.
+디바이스 트리 및 fd1ce01 커밋은 수정하지 않았습니다.
+
+이제 verify-port.py는 `check-integration.py`를 함께 실행합니다.
+`--pagani-device-tree`로 실제 사용할 현행화 트리를 지정할 수 있으며 기본값은
+`<rom-root>/device/oneplus/pagani`입니다. `--pagani-vendor-tree`도 지정하면
+생성된 모듈, 공유 blob 및 튜닝 설치 항목을 확인합니다. `libOplusSpatializerAidl`은
+스톡 원본 또는 pagani 추출기의 정확한 `add_needed('libbase.so')` 결과만 허용합니다.
+
+검증 내용:
+
+- 실제 extract-utils의 File/module-name 변환으로 신규 목록과 OReality를 비교:
+  공유 모듈 정의 중복 0개, PRODUCT_COPY_FILES 목적지 충돌 0개.
+- GNU Make로 true/false 평가: OReality 복사 항목 49개/0개.
+  false일 때 OReality의 package/namespace/property 추가도 없음.
+- 신규 목록의 공유 라이브러리 4개 및 공간 음향 튜닝 20개만 스톡에서 임시 복사하고,
+  spatializer의 libbase.so 보정을 적용한 뒤 실제 extract-utils로 해당 부분의
+  Android.bp와 pagani-vendor.mk를 생성해 통합 검증 통과.
+  전체 vendor 재생성이나 전체 ROM 빌드를 수행한 것은 아님.
+- 수정 전 OReality를 같은 신규 목록에 대조하면 모듈 2개/복사 20개 충돌을 검출.
+- 구형 device 목록 또는 구형 vendor 캐시를 지정하면 검증 실패.
+- 기존 72개 blob 해시, 효과 XML/권한/Manifest/프로파일/EQ 검증 유지.
+
+**적용 조건:** 실제 빌드 전에 반드시 현행화된 pagani 목록으로 vendor를 재생성해야
+합니다. 구형 vendor만 둔 상태에서 이 리베이스본을 단독 적용하면 공유 모듈이
+없어 빌드할 수 없습니다. 기존 커밋 해시는 변경되었고 이전 이력은 원본 저장소의
+백업 ref로 보존합니다. 전체 Soong/ROM 빌드 및 실기기 검증은 여전히 미수행입니다.

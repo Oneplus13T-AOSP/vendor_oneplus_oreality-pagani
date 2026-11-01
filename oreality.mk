@@ -18,7 +18,7 @@ ifeq ($(TARGET_ENABLE_ONEPlus_OREALITY),true)
 PRODUCT_SOONG_NAMESPACES += \
     vendor/oneplus/oreality-pagani
 
-# Effect engines and the effects HAL configuration.
+# Request the shared pagani engines, the local AudioX effect and HAL configuration.
 PRODUCT_PACKAGES += \
     oreality_audio_effects_config.xml \
     liboplus_audiox \
@@ -91,7 +91,7 @@ PRODUCT_COPY_FILES += \
     vendor/oneplus/oreality-pagani/proprietary/odm/etc/audio/audiox_param/SPK_VOICE_lvl4.bin:$(TARGET_COPY_OUT_ODM)/etc/audio/audiox_param/SPK_VOICE_lvl4.bin \
     vendor/oneplus/oreality-pagani/proprietary/odm/etc/audio/audiox_param/SPK_VOICE_lvl5.bin:$(TARGET_COPY_OUT_ODM)/etc/audio/audiox_param/SPK_VOICE_lvl5.bin
 
-# Shared headphone/speaker spatializer tuning is provided by vendor/pagani.
+# Shared headphone/speaker spatializer tuning is provided by vendor/oneplus/pagani.
 # Keep only the two additional AudioX room models absent from that tree.
 PRODUCT_COPY_FILES += \
     vendor/oneplus/oreality-pagani/proprietary/odm/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MOVIE_SPK.bin:$(TARGET_COPY_OUT_ODM)/etc/spatializer/SPAT_AUDIOX_ROOMMODEL_MOVIE_SPK.bin \

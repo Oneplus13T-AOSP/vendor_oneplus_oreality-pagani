@@ -445,6 +445,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rom-root", default="/home/ccc/android/pixelos",
                         help="PixelOS source root")
+    parser.add_argument("--pagani-device-tree", type=Path,
+                        help="updated pagani device tree used to generate the shared vendor modules")
+    parser.add_argument("--pagani-vendor-tree", type=Path,
+                        help="optional regenerated vendor/oneplus/pagani artifacts")
     args = parser.parse_args()
     rom_root = Path(args.rom_root).expanduser().resolve()
 
@@ -462,6 +466,13 @@ def main() -> int:
     check_components()
     check_profile_mapping()
     check_properties(rom_root)
+    command = [sys.executable, str(REPO / "tools/check-integration.py"),
+               "--rom-root", str(rom_root), "--device-tree",
+               str(args.pagani_device_tree or rom_root / "device/oneplus/pagani")]
+    if args.pagani_vendor_tree:
+        command.extend(["--vendor-tree", str(args.pagani_vendor_tree)])
+    if subprocess.run(command).returncode:
+        fail("pagani integration check failed; use the updated device tree and regenerate its vendor")
 
     for message in warnings:
         print(f"warning: {message}")
