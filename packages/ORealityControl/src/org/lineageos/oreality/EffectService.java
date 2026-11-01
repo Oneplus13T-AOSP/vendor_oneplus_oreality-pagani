@@ -4,15 +4,23 @@
 package org.lineageos.oreality;
 
 import android.app.Service;
+import android.hardware.display.DisplayManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
+import android.media.Spatializer;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Display;
+
+import java.util.ArrayList;
 
 /**
  * Persistent owner of the OReality and Holo Audio effects.
@@ -23,8 +31,7 @@ import android.util.Log;
  * effect after boot and after audioserver restarts. This service does the same
  * for the two effects registered by this port.
  *
- * <p>It is also the single writer, so the Settings screen and the Quick Settings
- * tile never race each other over effect parameters.
+ * <p>All parameter writes run on the main thread.
  */
 public final class EffectService extends Service {
     private static final String TAG = "ORealityService";
@@ -36,7 +43,61 @@ public final class EffectService extends Service {
     private Prefs mPrefs;
     private AudioXEffect mAudioX;
     private HoloAudioEffect mHolo;
-    private boolean mAudioXBroken;
+    private AudioManager mAudioManager;
+    private DisplayManager mDisplayManager;
+    private boolean mServerReady;
+    private boolean mDestroyed;
+    private int mRetries;
+    private boolean mRestoreHoloState = true;
+    private final ArrayList<Runnable> mListeners = new ArrayList<>();
+
+    void addListener(Runnable listener) { mListeners.add(listener); }
+    void removeListener(Runnable listener) { mListeners.remove(listener); }
+    private void notifyListeners() {
+        for (Runnable listener : new ArrayList<>(mListeners)) listener.run();
+    }
+    private final Runnable mRetry = () -> rebind(false);
+
+    final class LocalBinder extends Binder {
+        EffectService getService() { return EffectService.this; }
+    }
+
+    private final AudioManager.AudioServerStateCallback mServerCallback =
+            new AudioManager.AudioServerStateCallback() {
+        @Override public void onAudioServerDown() {
+            mServerReady = false;
+            mHandler.removeCallbacks(mRetry);
+            releaseAudioX();
+            notifyListeners();
+        }
+        @Override public void onAudioServerUp() {
+            if (mDestroyed) return;
+            mServerReady = true;
+            mRetries = 0;
+            mRestoreHoloState = true;
+            rebind(true);
+        }
+    };
+    private final AudioDeviceCallback mDeviceCallback = new AudioDeviceCallback() {
+        @Override public void onAudioDevicesAdded(AudioDeviceInfo[] devices) { rebind(false); }
+        @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] devices) { rebind(false); }
+    };
+    private final DisplayManager.DisplayListener mDisplayListener =
+            new DisplayManager.DisplayListener() {
+        @Override public void onDisplayAdded(int id) { updateHoloParameters(); }
+        @Override public void onDisplayRemoved(int id) { updateHoloParameters(); }
+        @Override public void onDisplayChanged(int id) { updateHoloParameters(); }
+    };
+    private final Spatializer.OnSpatializerStateChangedListener mSpatializerListener =
+            new Spatializer.OnSpatializerStateChangedListener() {
+        @Override public void onSpatializerAvailableChanged(Spatializer s, boolean available) {
+            restoreHoloState();
+            updateHoloParameters();
+        }
+        @Override public void onSpatializerEnabledChanged(Spatializer s, boolean enabled) {
+            updateHoloParameters();
+        }
+    };
 
     /** Returns the running service, or null when it is not alive yet. */
     static EffectService peek() {
@@ -51,17 +112,12 @@ public final class EffectService extends Service {
         }
     }
 
-    private final BroadcastReceiver mNoisyReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // The audio server went away; every effect handle is stale.
-            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
-                rebind(true);
-            }
+    private final BroadcastReceiver mVolumeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1)
+                    == AudioManager.STREAM_MUSIC) rebind(false);
         }
     };
-
-    private final AudioManager.OnAudioFocusChangeListener mFocusListener = focus -> { };
 
     @Override
     public void onCreate() {
@@ -69,16 +125,33 @@ public final class EffectService extends Service {
         sInstance = this;
         mPrefs = new Prefs(this);
         mHolo = new HoloAudioEffect(this);
-        rebind(false);
-        registerReceiver(mNoisyReceiver,
-                new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+        mAudioManager = getSystemService(AudioManager.class);
+        mDisplayManager = getSystemService(DisplayManager.class);
+        mAudioManager.setAudioServerStateCallback(mHandler::post, mServerCallback);
+        mAudioManager.registerAudioDeviceCallback(mDeviceCallback, mHandler);
+        if (mDisplayManager != null) mDisplayManager.registerDisplayListener(mDisplayListener, mHandler);
+        mHolo.addStateListener(mHandler::post, mSpatializerListener);
+        registerReceiver(mVolumeReceiver, new IntentFilter(AudioManager.ACTION_VOLUME_CHANGED),
                 Context.RECEIVER_NOT_EXPORTED);
+        mServerReady = mAudioManager.isAudioServerRunning();
+        rebind(false);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        rebind(false);
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
+        mDestroyed = true;
         sInstance = null;
-        unregisterReceiver(mNoisyReceiver);
+        mAudioManager.clearAudioServerStateCallback();
+        mAudioManager.unregisterAudioDeviceCallback(mDeviceCallback);
+        if (mDisplayManager != null) mDisplayManager.unregisterDisplayListener(mDisplayListener);
+        mHolo.removeStateListener(mSpatializerListener);
+        unregisterReceiver(mVolumeReceiver);
         releaseAudioX();
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
@@ -86,7 +159,7 @@ public final class EffectService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return new LocalBinder();
     }
 
     /**
@@ -95,43 +168,77 @@ public final class EffectService extends Service {
      * @param force release the current handle first
      */
     void rebind(boolean force) {
-        if (force) {
-            releaseAudioX();
-        }
-        if (mAudioX == null && !mAudioXBroken) {
+        if (mDestroyed || !mServerReady) return;
+        if (force) releaseAudioX();
+        if (mAudioX == null) {
             try {
-                AudioXEffect effect = new AudioXEffect(AudioManager.AUDIO_SESSION_ID_GENERATE);
-                if (!effect.isPresent()) {
-                    Log.w(TAG, "AudioX effect is not registered; it will not be restored");
-                    effect.release();
-                    mAudioXBroken = true;
-                } else {
-                    mAudioX = effect;
-                }
+                mAudioX = new AudioXEffect(1);
+                mAudioX.setControlListener(() -> applyState());
+                mHandler.removeCallbacks(mRetry);
             } catch (RuntimeException unavailable) {
-                Log.w(TAG, "cannot create the AudioX effect", unavailable);
-                mAudioXBroken = true;
+                Log.w(TAG, "cannot create AudioX", unavailable);
+                scheduleRetry();
             }
         }
         applyState();
     }
 
-    /** Applies the persisted selection to whichever effects are alive. */
-    private void applyState() {
-        boolean enabled = mPrefs.isRealityEnabled();
-        if (mAudioX != null && mAudioX.hasControl()) {
-            mAudioX.setEnabled(enabled);
-            mAudioX.setProfile(mPrefs.getProfile());
-            mAudioX.setVolumeIndex(mHolo.getMusicVolumeIndex());
-            mAudioX.setEqualizer(mPrefs.isEqualizerEnabled(),
-                    mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains());
+    private void scheduleRetry() {
+        mHandler.removeCallbacks(mRetry);
+        if (!mDestroyed && mServerReady && mRetries++ < 5) {
+            mHandler.postDelayed(mRetry, 2000);
         }
-        if (mHolo.isSupported()) {
-            mHolo.setEnabled(mPrefs.isHoloEnabled());
+    }
+
+    /** Applies settings without allowing a stale native handle to crash the process. */
+    private boolean applyState() {
+        if (mDestroyed || !mServerReady) return false;
+        boolean accepted = false;
+        try {
+            if (mAudioX != null && mAudioX.hasControl()) {
+                accepted = mAudioX.setEnabled(mPrefs.isRealityEnabled())
+                        == android.media.audiofx.AudioEffect.SUCCESS;
+                accepted &= mAudioX.setProfile(mPrefs.getProfile());
+                accepted &= mAudioX.setVolumeIndex(mHolo.getMusicVolumeIndex());
+                accepted &= mAudioX.setEqualizer(mPrefs.isEqualizerEnabled()
+                                && mPrefs.getProfile() == AudioXEffect.PROFILE_CUSTOM,
+                        mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains());
+            }
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "AudioX handle is unavailable", unavailable);
+            releaseAudioX();
+            scheduleRetry();
+        }
+        restoreHoloState();
+        updateHoloParameters();
+        if (accepted) mRetries = 0;
+        return accepted;
+    }
+
+    private void restoreHoloState() {
+        if (!mRestoreHoloState || !mServerReady || mDestroyed) return;
+        try {
+            if (mHolo.isSupported()) {
+                mHolo.setEnabled(mPrefs.isHoloEnabled());
+                mRestoreHoloState = false;
+            }
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "cannot restore spatializer state", unavailable);
+        }
+    }
+
+    private void updateHoloParameters() {
+        if (mDestroyed || !mServerReady) return;
+        try {
+            mHolo.setProfile(mPrefs.getProfile());
             mHolo.setVolumeIndex(mHolo.getMusicVolumeIndex());
-            mHolo.setRotation(mHolo.getMusicVolumeIndex() >= 0
-                    ? getDisplayRotationQuarters() : 0);
+            Display display = mDisplayManager == null ? null
+                    : mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
+            mHolo.setRotation(display == null ? 0 : display.getRotation());
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "cannot update spatializer parameters", unavailable);
         }
+        notifyListeners();
     }
 
     private void releaseAudioX() {
@@ -143,11 +250,14 @@ public final class EffectService extends Service {
             }
             mAudioX = null;
         }
-        mAudioXBroken = false;
     }
 
     boolean isRealityEnabled() {
-        return mAudioX != null && mAudioX.isEnabled();
+        try {
+            return mAudioX != null && mAudioX.isEnabled();
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
     }
 
     boolean isRealityPresent() {
@@ -156,18 +266,13 @@ public final class EffectService extends Service {
 
     boolean setRealityEnabled(boolean enabled) {
         mPrefs.setRealityEnabled(enabled);
-        boolean accepted = mAudioX == null
-                || mAudioX.setEnabled(enabled) == android.media.audiofx.AudioEffect.SUCCESS;
-        return accepted;
+        return applyState();
     }
 
     boolean setProfile(int profile) {
+        if (EffectProtocol.audioxProfile(profile) < 0) return false;
         mPrefs.setProfile(profile);
-        boolean accepted = mAudioX == null || mAudioX.setProfile(profile);
-        if (mHolo.isSupported()) {
-            mHolo.setProfile(profile);
-        }
-        return accepted;
+        return applyState();
     }
 
     int getProfile() {
@@ -176,6 +281,7 @@ public final class EffectService extends Service {
 
     boolean setEqualizerEnabled(boolean enabled) {
         mPrefs.setEqualizerEnabled(enabled);
+        if (enabled) mPrefs.setProfile(AudioXEffect.PROFILE_CUSTOM);
         return pushEqualizer();
     }
 
@@ -193,10 +299,7 @@ public final class EffectService extends Service {
     }
 
     private boolean pushEqualizer() {
-        boolean accepted = mAudioX == null
-                || mAudioX.setEqualizer(mPrefs.isEqualizerEnabled(),
-                        mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains());
-        return accepted;
+        return applyState();
     }
 
     boolean isHoloSupported() {
@@ -213,17 +316,18 @@ public final class EffectService extends Service {
 
     boolean setHoloEnabled(boolean enabled) {
         mPrefs.setHoloEnabled(enabled);
-        mHolo.setEnabled(enabled);
-        return true;
+        mRestoreHoloState = false;
+        try {
+            mHolo.setEnabled(enabled);
+            updateHoloParameters();
+            return mHolo.isEnabled() == enabled;
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "cannot change spatializer state", unavailable);
+            return false;
+        }
     }
 
     String describeHoloLevel() {
         return mHolo.describeImmersiveLevel();
-    }
-
-    private int getDisplayRotationQuarters() {
-        // The spatializer expects the DisplayManager rotation, which is already
-        // expressed in quarter turns (0, 1, 2, 3).
-        return getDisplay() == null ? 0 : getDisplay().getRotation();
     }
 }

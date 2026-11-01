@@ -17,7 +17,7 @@ import android.widget.TextView;
 /**
  * Ten-band graphic equalizer, matching the band count the AudioX engine accepts.
  *
- * <p>Gains are in 1/100 dB steps, the unit the engine consumes directly, so a
+ * <p>Gains are stored in 1/100 dB steps and converted to Q22 dB at the effect, so a
  * value of 300 is +3.00 dB. The range matches the stock OPlus equalizer.
  *
  * <p>The layout is built in code so this port does not need to carry a copy of
@@ -42,7 +42,7 @@ public final class EqualizerActivity extends Activity {
         setTitle(R.string.oreality_equalizer_bands);
         EffectService.start(this);
 
-        int[] stored = new int[AudioXEffect.EQ_BANDS];
+        int[] stored = new Prefs(this).getEqualizerGains();
         EffectService service = EffectService.peek();
         if (service != null) {
             stored = service.getEqualizerGains();
@@ -153,6 +153,8 @@ public final class EqualizerActivity extends Activity {
         }
         if (service != null) {
             service.setEqualizerGains(mGains.clone());
+        } else {
+            new Prefs(this).setEqualizerGains(mGains.clone());
         }
     }
 

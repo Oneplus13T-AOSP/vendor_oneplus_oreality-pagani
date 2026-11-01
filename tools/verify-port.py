@@ -9,8 +9,8 @@ Checks, in order:
   1. every blob in proprietary-files.txt exists and matches its pinned SHA-256
   2. the effects XML is well formed, has no duplicate UUIDs, and registers the
      two effect libraries with the UUIDs the binaries really report
-  3. the ELF dependency closure of the installed libraries resolves inside the
-     produced images, so nothing fails to dlopen at runtime
+  3. direct ELF dependencies and required pagani ODM providers are present
+     (not a runtime linker namespace or ABI compatibility guarantee)
   4. the HAL configuration that this port overrides is really shadowed: the
      /odm/etc copy is installed and the search order puts it first
   5. the control app's declared permissions match the privileged allowlist
@@ -21,6 +21,7 @@ import hashlib
 import re
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -29,7 +30,7 @@ REPO = Path(__file__).resolve().parent.parent
 # UUIDs that the stock libraries report, established by reading the
 # getEffectTypeUuid*/getEffectImplUuid* symbols in the binaries.
 AUDIOX_IMPL_UUID = "41f6c0f4-5d8f-11ec-bf63-0242ac130002"
-AUDIOX_TYPE_UUID = "ec7178ec-e5e1-4432-a3f4-4657e6795210"
+AUDIOX_TYPE_UUID = AUDIOX_IMPL_UUID
 SPATIALIZER_IMPL_UUID = "de4d6aaf-4e9d-473d-8168-4ce92d50a637"
 
 # Libraries the effect engine and spatializer must be able to resolve.
@@ -96,7 +97,7 @@ def check_blobs() -> None:
             fail(f"missing blob: {rel}")
             continue
         if rel not in expected:
-            warn(f"blob is not pinned: {rel}")
+            fail(f"blob is not pinned: {rel}")
             continue
         actual = sha256(path)
         if actual != expected[rel]:
@@ -176,9 +177,11 @@ def check_effects_xml() -> None:
 def readelf_needed(path: Path) -> list[str]:
     try:
         out = subprocess.run(["readelf", "-d", str(path)],
-                             capture_output=True, text=True, check=False).stdout
-    except FileNotFoundError:
+                             capture_output=True, text=True, check=True).stdout
+    except (FileNotFoundError, subprocess.CalledProcessError) as error:
+        fail(f"cannot inspect ELF {path}: {error}")
         return []
+
     result = []
     for line in out.splitlines():
         if "NEEDED" in line and "[" in line:
@@ -199,7 +202,7 @@ def find_soname(root: Path, name: str) -> Path | None:
 def check_dependencies(rom_root: Path) -> None:
     out = rom_root / "out/target/product/pagani"
     if not out.is_dir():
-        warn(f"{out} does not exist; dependency closure checked against the blobs only")
+        warn(f"{out} does not exist; installed dependency providers are not verified")
         image_root = None
     else:
         image_root = out
@@ -212,7 +215,18 @@ def check_dependencies(rom_root: Path) -> None:
             fail(f"{lib} is missing from proprietary/")
             continue
         for needed in readelf_needed(path):
+            if needed in {"libMNN.so", "libc++_shared.so"}:
+                provider = rom_root / "vendor/oneplus/pagani/proprietary/odm/lib64" / needed
+                if not provider.is_file():
+                    fail(f"missing required pagani ODM provider: {provider}")
+                elif image_root and not find_soname(image_root, needed):
+                    fail(f"required ODM provider not installed: {needed}")
+                continue
             if needed in PLATFORM_PROVIDED:
+                if image_root and not find_soname(image_root, needed):
+                    # Bionic and some LLNDK providers live in APEXes instead.
+                    if needed not in {"libc.so", "libdl.so", "libm.so", "libdl_android.so"}:
+                        fail(f"missing platform provider in build output: {needed}")
                 continue
             if image_root and find_soname(image_root, needed):
                 continue
@@ -221,11 +235,20 @@ def check_dependencies(rom_root: Path) -> None:
                 continue
             fail(f"{lib} needs {needed}, which is not provided")
 
-    print(f"  dependency closure checked for {len(REQUIRED_LIBS)} libraries")
+    print(f"  direct DT_NEEDED checks for {len(REQUIRED_LIBS)} libraries (not runtime linker/ABI validation)")
 
 
 def check_hal_config(rom_root: Path) -> None:
     """The Hal must pick the /odm copy, not the sku_sun copy."""
+    config_h = rom_root / "system/media/audio/include/system/audio_config.h"
+    if not config_h.is_file():
+        fail(f"cannot verify HAL search order: {config_h} is missing")
+    else:
+        header = config_h.read_text(encoding="utf-8")
+        lists = re.findall(r'return std::vector<std::string>\(\{(.*?)\}\)', header, re.S)
+        if len(lists) != 2 or any(not values.strip().startswith('"/odm/etc"')
+                                  for values in lists):
+            fail("audio configuration paths do not start with /odm/etc in both SKU branches")
     out = rom_root / "out/target/product/pagani"
     if not out.is_dir():
         warn("no pagani build output; HAL configuration shadowing not verified")
@@ -240,14 +263,8 @@ def check_hal_config(rom_root: Path) -> None:
         if marker not in text:
             fail(f"{odm_copy} does not register {marker}")
 
-    # The search order is /odm/etc, /vendor/etc/audio/sku_<sku>, /vendor/etc,
-    # /system/etc, so the sku copy may still exist; it just must not be the one
-    # that wins. Assert the search order text still starts at /odm/etc.
-    config_h = rom_root / "system/media/audio/include/system/audio_config.h"
-    if config_h.exists():
-        header = config_h.read_text(encoding="utf-8", errors="replace")
-        if '"/odm/etc"' not in header:
-            fail("audio_config.h no longer searches /odm/etc first")
+    if odm_copy.read_bytes() != (REPO / "configs/audio/audio_effects_config.xml").read_bytes():
+        fail("installed effects configuration differs from the reviewed source")
 
     print("  HAL configuration shadowing verified")
 
@@ -321,8 +338,16 @@ def check_build_rules() -> None:
         if "privapp-permissions-oreality.xml" not in block:
             continue
         header = block.split("}", 1)[0]
-        if "system: true" not in header:
-            fail("privapp allowlist must be installed on /system")
+        if "system: true" in header:
+            fail("prebuilt_etc has no system property; /system is the default partition")
+        for flag in ("device_specific", "vendor", "soc_specific", "product_specific",
+                     "system_ext_specific"):
+            if f"{flag}: true" in header:
+                fail(f"allowlist must remain on /system, found {flag}")
+        module = re.search(r'name:\s*"([^"]+)"', header)
+        makefile = (REPO / "oreality.mk").read_text()
+        if module is None or module.group(1) not in makefile.split():
+            fail("allowlist module is absent from PRODUCT_PACKAGES")
         if 'sub_dir: "permissions"' not in header:
             fail("privapp allowlist must be installed under etc/permissions")
         break
@@ -352,6 +377,12 @@ def check_settings_entry() -> None:
                  "Settings hides injected tiles without it")
         if "com.android.settings.category" not in meta:
             fail(f"{activity.get(ns + 'name')} has no com.android.settings.category")
+        for key, value in {
+            "com.android.settings.category": "com.android.settings.category.ia.sound",
+            "com.android.settings.group_key": "system_sounds_and_vibrations_category",
+        }.items():
+            if key in meta and meta[key].get(ns + "value") != value:
+                fail(f"{activity.get(ns + 'name')} has incorrect {key}")
         for required in ("com.android.settings.title",
                          "com.android.settings.summary",
                          "com.android.settings.order"):
@@ -365,19 +396,34 @@ def check_settings_entry() -> None:
 
 
 def check_profile_mapping() -> None:
-    """The public profile ids must be translated, not passed through.
+    """Execute protocol regressions on the host, independently of Android stubs."""
+    source = REPO / "packages/ORealityControl/src/org/lineageos/oreality/EffectProtocol.java"
+    test = REPO / "tools/tests/EffectProtocolTest.java"
+    try:
+        with tempfile.TemporaryDirectory(prefix="oreality-protocol-") as temp:
+            subprocess.run(["javac", "-d", temp, str(source), str(test)], check=True,
+                           capture_output=True, text=True)
+            subprocess.run(["java", "-cp", temp, "org.lineageos.oreality.EffectProtocolTest"],
+                           check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        fail(f"protocol regression failed: {error} {getattr(error, 'stderr', '')}")
+        return
+    print("  profile and Q22 behavior verified")
 
-    Stock AudioxEffect maps public music (1) to engine slot 2; writing the raw
-    value would select the wrong profile.
-    """
-    source = (REPO / "packages/ORealityControl/src/org/lineageos/oreality"
-              "/AudioXEffect.java").read_text(encoding="utf-8")
-    if "case PROFILE_MUSIC:" not in source or "return 2;" not in source:
-        fail("AudioXEffect.mapProfile must translate PROFILE_MUSIC to engine slot 2")
-    if "4194304" not in source and "2, 22" not in source:
-        fail("AudioXEffect must scale EQ gains by 2^22 before writing them")
 
-    print("  profile mapping verified")
+def check_components() -> None:
+    root = ET.parse(REPO / "packages/ORealityControl/AndroidManifest.xml").getroot()
+    ns = "{http://schemas.android.com/apk/res/android}"
+    package = root.get("package")
+    sources = REPO / "packages/ORealityControl/src"
+    for kind in ("activity", "service", "receiver"):
+        for node in root.iter(kind):
+            name = node.get(ns + "name", "")
+            fqcn = package + name if name.startswith(".") else (
+                package + "." + name if "." not in name else name)
+            if not (sources / (fqcn.replace(".", "/") + ".java")).is_file():
+                fail(f"manifest {kind} has no matching Java class: {fqcn}")
+    print("  manifest component classes verified")
 
 
 def check_properties(rom_root: Path) -> None:
@@ -413,6 +459,7 @@ def main() -> int:
     check_permissions(rom_root)
     check_build_rules()
     check_settings_entry()
+    check_components()
     check_profile_mapping()
     check_properties(rom_root)
 
@@ -423,7 +470,7 @@ def main() -> int:
         for message in failures:
             print(f"  - {message}", file=sys.stderr)
         return 1
-    print("\nall checks passed")
+    print("\nstatic checks passed; full build, runtime loading and audio behavior remain unverified")
     return 0
 
 

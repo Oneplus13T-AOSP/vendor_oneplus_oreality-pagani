@@ -88,31 +88,26 @@ def verify() -> int:
 def extract(dump: Path, write_sums: bool) -> int:
     entries = read_list()
     expected = load_sums()
-    missing: list[str] = []
-    unpinned: list[str] = []
-    copied = 0
-
+    # Validate every input before replacing any previously verified output.
+    missing = [rel for rel in entries if not (dump / rel).is_file()]
+    if missing:
+        print("error: missing dump inputs: " + ", ".join(missing), file=sys.stderr)
+        return 1
+    digests = {rel: sha256(dump / rel) for rel in entries}
+    mismatches = [rel for rel in entries if rel in expected and digests[rel] != expected[rel]]
+    unlisted = [rel for rel in entries if rel not in expected]
+    if mismatches or (unlisted and not write_sums):
+        for rel in mismatches:
+            print(f"error: {rel} differs from the pinned dump", file=sys.stderr)
+        for rel in unlisted:
+            print(f"error: {rel} is unpinned; use --write-sums to add it", file=sys.stderr)
+        return 1
+    unpinned = [f"{digests[rel]}  {rel}" for rel in unlisted]
     for rel in entries:
-        src = dump / rel
-        if not src.is_file():
-            missing.append(rel)
-            continue
         dst = DEST / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        copied += 1
-        digest = sha256(src)
-        if rel in expected and expected[rel] != digest:
-            print(f"warning: {rel} differs from the pinned dump", file=sys.stderr)
-        if rel not in expected:
-            unpinned.append(f"{digest}  {rel}")
-
-    if missing:
-        print("error: missing files in the supplied dump:", file=sys.stderr)
-        for rel in missing:
-            print(f"  {rel}", file=sys.stderr)
-        print("\nThis dump is not a ColorOS/OxygenOS 17 pagani build.", file=sys.stderr)
-        return 1
+        shutil.copy2(dump / rel, dst)
+    copied = len(entries)
 
     if write_sums and unpinned:
         if SUMS.exists():

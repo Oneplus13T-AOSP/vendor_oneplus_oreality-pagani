@@ -42,7 +42,8 @@ final class Prefs {
     }
 
     int getProfile() {
-        return mPrefs.getInt(KEY_OREALITY_PROFILE, DEFAULT_PROFILE);
+        int profile = mPrefs.getInt(KEY_OREALITY_PROFILE, DEFAULT_PROFILE);
+        return EffectProtocol.audioxProfile(profile) >= 0 ? profile : DEFAULT_PROFILE;
     }
 
     void setProfile(int profile) {
@@ -69,7 +70,7 @@ final class Prefs {
         }
         try {
             for (int band = 0; band < gains.length; band++) {
-                gains[band] = Integer.parseInt(parts[band].trim());
+                gains[band] = Math.max(-1200, Math.min(1200, Integer.parseInt(parts[band].trim())));
             }
         } catch (NumberFormatException invalid) {
             return new int[AudioXEffect.EQ_BANDS];

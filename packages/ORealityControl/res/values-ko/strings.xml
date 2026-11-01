@@ -20,12 +20,12 @@
     <string name="profile_movie">영화</string>
     <string name="profile_game">게임</string>
     <string name="profile_custom">사용자 지정</string>
-    <string name="profile_intelligence">스마트</string>
+    <string name="profile_intelligence">기본</string>
     <string name="profile_immersion">몰입</string>
     <string name="profile_fidelity">고음질</string>
 
     <string name="holo_title">홀로 오디오</string>
-    <string name="holo_summary">재생 중인 앱마다 가상 공간의 위치를 지정합니다</string>
+    <string name="holo_summary">OnePlus 공간 오디오 렌더링</string>
     <string name="holo_keywords">홀로, 오디오, 공간음향, 스피셜라이저, 원플러스</string>
     <string name="holo_enable">홀로 오디오 사용</string>
     <string name="holo_enable_summary">미디어를 원플러스 공간화 엔진으로 렌더링합니다</string>

@@ -15,8 +15,7 @@ import java.util.UUID;
  * ({@code c0.a} / {@code AudioxEffect}):
  *
  * <ul>
- *   <li>type = {@link #EFFECT_TYPE_NULL} (AOSP {@code kEffectUuidNull}, the
- *       effect has no standard type)</li>
+ *   <li>selection type = {@link #EFFECT_TYPE_NULL}; select by implementation UUID</li>
  *   <li>impl = {@code 41f6c0f4-5d8f-11ec-bf63-0242ac130002}</li>
  *   <li>attached to the global output mix (session 0)</li>
  *   <li>parameters use the vendor parameter space {@code 0x10010000}</li>
@@ -28,7 +27,7 @@ import java.util.UUID;
  * while still using the platform API at runtime.
  */
 final class AudioXEffect {
-    /** AOSP {@code kEffectUuidNull}: no standard effect type. */
+    /** AOSP wildcard for selecting by implementation; not the engine's type UUID. */
     static final UUID EFFECT_TYPE_NULL =
             UUID.fromString("ec7178ec-e5e1-4432-a3f4-4657e6795210");
     /** OnePlus AudioX implementation UUID. */
@@ -49,9 +48,8 @@ final class AudioXEffect {
     static final int EQ_BANDS = 10;
 
     /*
-     * Public profile ids, exactly as stored in Settings.System
-     * "system_effect_profile" and shown by the stock OReality UI. These are NOT
-     * the values the engine receives: the stock AudioxEffect translates them
+     * Port preference ids. These are NOT stock profile ids or
+     * the values the engine receives: EffectProtocol translates them
      * before writing PARAM_PROFILE.
      */
     static final int PROFILE_INTELLIGENCE = 0;
@@ -90,6 +88,12 @@ final class AudioXEffect {
         return false;
     }
 
+    void setControlListener(Runnable restore) {
+        mEffect.setControlStatusListener((effect, granted) -> {
+            if (granted) restore.run();
+        });
+    }
+
     boolean hasControl() {
         return mEffect.hasControl();
     }
@@ -108,7 +112,7 @@ final class AudioXEffect {
 
     /** Stock profile index, see the {@code PROFILE_*} constants. */
     boolean setProfile(int profile) {
-        int engine = mapProfile(profile);
+        int engine = EffectProtocol.audioxProfile(profile);
         if (engine < 0) {
             return false;
         }
@@ -129,11 +133,12 @@ final class AudioXEffect {
         if (!setBytes(PARAM_EQ_ENABLE, intToBytes(enabled ? 1 : 0))) {
             return false;
         }
+        if (!enabled) return true;
         byte[] payload = new byte[(EQ_BANDS + 2) * 4];
         writeInt(volumeIndex, payload, 0);
         writeInt(EQ_BANDS, payload, 4);
         for (int band = 0; band < EQ_BANDS; band++) {
-            writeInt(toEngineGain(millibels[band]), payload, 8 + band * 4);
+            writeInt(EffectProtocol.gainQ22(millibels[band]), payload, 8 + band * 4);
         }
         return setBytes(PARAM_EQ_GAINS, payload);
     }
@@ -177,49 +182,6 @@ final class AudioXEffect {
         } catch (NoSuchMethodException e) {
             return null;
         }
-    }
-
-    /**
-     * Translates a public profile id to the index the effect expects.
-     *
-     * <p>Copied from the stock {@code AudioxEffect#setProfile}: every profile
-     * except music, movie, game and custom maps to the engine's default slot 6.
-     * The public music id 1 maps to engine slot 2, which is the trap this
-     * translation exists for.
-     *
-     * @return the engine index, or -1 when the id is not a known profile
-     */
-    private static int mapProfile(int profile) {
-        switch (profile) {
-            case PROFILE_MUSIC:
-                return 2;
-            case PROFILE_MOVIE:
-                return 3;
-            case PROFILE_GAME:
-                return 4;
-            case PROFILE_CUSTOM:
-                return 6;
-            case PROFILE_INTELLIGENCE:
-                return 6;
-            case PROFILE_IMMERSION:
-                return 4;
-            case PROFILE_FIDELITY:
-                return 5;
-            default:
-                return -1;
-        }
-    }
-
-    /**
-     * Converts millibels to the Q22 fixed-point value the AudioX engine reads.
-     *
-     * <p>The stock service stores the preset gains in
-     * {@code Settings.System} and then computes
-     * {@code (int) Math.floor(gain * Math.pow(2, 22))} before every write, so
-     * the engine never receives the raw value.
-     */
-    private static int toEngineGain(int millibels) {
-        return (int) Math.floor(millibels * 4194304.0d);
     }
 
     private static byte[] intToBytes(int value) {

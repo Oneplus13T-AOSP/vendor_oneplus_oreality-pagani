@@ -33,21 +33,12 @@ PRODUCT_PACKAGES += \
 # AudioX is a vendor effect selected by its own type property. The stock
 # ColorOS 17 value is "audiox_merge"; without it the AudioX library falls back
 # to a single-profile path.
-PRODUCT_PROPERTY_OVERRIDES += \
+PRODUCT_VENDOR_PROPERTIES += \
     ro.oplus.audio.effect.type=audiox_merge
 
-# The framework only exposes android.media.Spatializer when
-# ro.audio.spatializer_enabled is true. On stock this lives in the system
-# build.prop; here it is a product override so it lands in the same file.
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.audio.spatializer_enabled=true \
-    ro.audio.spatializer_type=oplus
-
-# Declares the OPlus MetaAudio feature so the Holo Audio capability check reads
-# the same value the stock device publishes.
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.oplus.audio.support.meta_audio=1 \
-    ro.oplus.audio.holo_audio_version=2.0
+# AudioService reads this platform property to initialize SpatializerHelper.
+PRODUCT_SYSTEM_PROPERTIES += \
+    ro.audio.spatializer_enabled=true
 
 # AudioX tuning: 7 headphone profiles and 40 speaker profiles, all from the
 # matching ColorOS 17 pagani dump.

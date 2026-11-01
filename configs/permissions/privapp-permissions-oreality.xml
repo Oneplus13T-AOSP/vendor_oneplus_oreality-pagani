@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!--
     ORealityControl is /system/priv-app. The privileged permission allowlist
-    must therefore live on /system, which is what system: true selects.
+    must therefore live on /system, the default partition for prebuilt_etc.
 -->
 <permissions>
     <privapp-permissions package="com.oplus.oreality.audio">

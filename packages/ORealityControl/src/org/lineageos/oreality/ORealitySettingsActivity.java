@@ -19,12 +19,11 @@ import android.widget.Toast;
  *
  * <p>Presents the same choices the stock OPlus control surface offers: on/off,
  * the profile (music, movie, game, custom) and the ten-band graphic equalizer
- * that belongs to the custom profile. All values are read back from the engine,
- * never echoed from the request.
+ * that belongs to the custom profile. Enable state is read from the effect;
+ * the profile and EQ controls display the persisted selection.
  */
 @SuppressWarnings("deprecation")
-public final class ORealitySettingsActivity extends PreferenceActivity {
-    private EffectService mService;
+public final class ORealitySettingsActivity extends EffectPreferenceActivity {
     private SwitchPreference mEnabled;
     private ListPreference mProfile;
     private SwitchPreference mEqualizer;
@@ -35,7 +34,6 @@ public final class ORealitySettingsActivity extends PreferenceActivity {
         super.onCreate(state);
         setTitle(R.string.oreality_title);
         EffectService.start(this);
-        mService = EffectService.peek();
 
         PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(this);
         setPreferenceScreen(screen);
@@ -108,27 +106,21 @@ public final class ORealitySettingsActivity extends PreferenceActivity {
     protected void onResume() {
         super.onResume();
         EffectService.start(this);
-        mService = EffectService.peek();
         refresh();
     }
 
     private EffectService mService() {
-        if (mService == null) {
-            mService = EffectService.peek();
-        }
-        if (mService == null) {
-            EffectService.start(this);
-            mService = EffectService.peek();
-        }
-        if (mService == null) {
-            throw new IllegalStateException("effect service is not running");
-        }
-        return mService;
+        return EffectService.peek();
     }
 
-    private void refresh() {
+    @Override
+    void refresh() {
         EffectService service = EffectService.peek();
         if (service == null) {
+            mEnabled.setEnabled(false);
+            mProfile.setEnabled(false);
+            mEqualizer.setEnabled(false);
+            mBands.setEnabled(false);
             return;
         }
         boolean present = service.isRealityPresent();

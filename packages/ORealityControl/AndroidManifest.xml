@@ -27,7 +27,7 @@
 
         <!-- Settings > Sound & vibration: OReality Audio. -->
         <activity
-            android:name=".ORealitySettingsActivity"
+            android:name="org.lineageos.oreality.ORealitySettingsActivity"
             android:exported="true"
             android:label="@string/oreality_title">
             <intent-filter>
@@ -58,7 +58,7 @@
 
         <!-- Settings > Sound & vibration: Holo Audio, below OReality. -->
         <activity
-            android:name=".HoloAudioSettingsActivity"
+            android:name="org.lineageos.oreality.HoloAudioSettingsActivity"
             android:exported="true"
             android:label="@string/holo_title">
             <intent-filter>
@@ -85,25 +85,24 @@
         </activity>
 
         <activity
-            android:name=".EqualizerActivity"
+            android:name="org.lineageos.oreality.EqualizerActivity"
             android:exported="false"
             android:label="@string/oreality_equalizer_bands" />
 
         <!-- Persistent owner of both AudioEffect handles. -->
         <service
-            android:name=".EffectService"
+            android:name="org.lineageos.oreality.EffectService"
             android:directBootAware="true"
             android:exported="false" />
 
         <receiver
-            android:name=".BootReceiver"
+            android:name="org.lineageos.oreality.BootReceiver"
             android:directBootAware="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
             </intent-filter>
         </receiver>
     </application>

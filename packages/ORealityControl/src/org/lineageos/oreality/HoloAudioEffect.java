@@ -6,7 +6,7 @@ package org.lineageos.oreality;
 import android.content.Context;
 import android.media.AudioManager;
 import android.media.Spatializer;
-import android.os.SystemProperties;
+
 
 import java.util.Locale;
 
@@ -24,8 +24,8 @@ import java.util.Locale;
  *
  * <table>
  *   <tr><th>Key</th><th>Meaning</th></tr>
- *   <tr><td>0x100100BB</td><td>effect profile (shared with AudioX: 2 music,
- *       3 movie, 4 game, 6 custom)</td></tr>
+ *   <tr><td>0x100100BB</td><td>stock profile id (2 music, 1 movie,
+ *       4 game, 0 custom; different from AudioX engine slots)</td></tr>
  *   <tr><td>0x100100BE</td><td>speaker tuning table for the volume index</td></tr>
  *   <tr><td>0x100100BF</td><td>display rotation 0..3, in quarter turns</td></tr>
  *   <tr><td>0x100100C0</td><td>fold state</td></tr>
@@ -40,7 +40,7 @@ import java.util.Locale;
  * placement controls.
  */
 final class HoloAudioEffect {
-    /** Shared effect profile key; the spatializer and AudioX agree on the value. */
+    /** Shared parameter key; payload ids differ from AudioX engine slots. */
     static final int PARAM_PROFILE = 0x100100BB;
     /** Speaker tuning table for the current music volume index. */
     static final int PARAM_VOLUME_INDEX = 0x100100BE;
@@ -81,13 +81,14 @@ final class HoloAudioEffect {
         }
     }
 
-    /** Profile index shared with AudioX, or -1 when it cannot be read. */
+    /** Stock spatializer profile id, or -1 when it cannot be read. */
     int getProfile() {
         return getInt(PARAM_PROFILE);
     }
 
     boolean setProfile(int profile) {
-        return setInt(PARAM_PROFILE, profile);
+        int stock = EffectProtocol.spatializerProfile(profile);
+        return stock >= 0 && setInt(PARAM_PROFILE, stock);
     }
 
     /** Volume index used to pick the speaker tuning table. */
@@ -122,14 +123,25 @@ final class HoloAudioEffect {
         }
     }
 
-    /**
-     * Whether the OPlus MetaAudio multi-app routing stack is present.
-     *
-     * <p>Only the vendor property is read. The services that implement the
-     * routing are not installed by this port.
-     */
     static boolean isMultiAppSupported() {
-        return SystemProperties.getInt("ro.oplus.audio.support.meta_audio", 0) == 1;
+        return false; // The renderer alone does not provide per-app routing.
+    }
+
+    void addStateListener(java.util.concurrent.Executor executor,
+            Spatializer.OnSpatializerStateChangedListener listener) {
+        if (mSpatializer != null) {
+            mSpatializer.addOnSpatializerStateChangedListener(executor, listener);
+            mSpatializer.setOnSpatializerOutputChangedListener(executor,
+                    (spatializer, output) -> listener.onSpatializerAvailableChanged(
+                            spatializer, spatializer.isAvailable()));
+        }
+    }
+
+    void removeStateListener(Spatializer.OnSpatializerStateChangedListener listener) {
+        if (mSpatializer != null) {
+            mSpatializer.removeOnSpatializerStateChangedListener(listener);
+            mSpatializer.clearOnSpatializerOutputChangedListener();
+        }
     }
 
     boolean isHeadsetConnected() {
@@ -147,7 +159,7 @@ final class HoloAudioEffect {
         if (max > 100) {
             index /= 10;
         }
-        return Math.max(0, index);
+        return Math.max(0, Math.min(16, index));
     }
 
     private int getInt(int key) {

@@ -4,7 +4,7 @@
 //
 // OnePlus 13T (pagani) OReality Audio + Holo Audio effect stack.
 //
-// Everything here is a prebuilt from the matching OxygenOS 17 dump except the
+// Everything here is a prebuilt from the matching ColorOS 17 dump except the
 // small control app. The effect libraries are loaded by the AIDL effects HAL
 // (libaudioeffecthal.qti) from /odm/lib64/soundfx.
 //
@@ -73,10 +73,10 @@ prebuilt_etc {
 }
 
 prebuilt_etc {
-    name: "privapp-permissions-oreality.xml",
+    name: "privapp-permissions-oreality",
+    filename: "privapp-permissions-oreality.xml",
     src: "configs/permissions/privapp-permissions-oreality.xml",
     sub_dir: "permissions",
-    system: true,
 }
 
 // Single platform-signed app that provides both Settings entries:

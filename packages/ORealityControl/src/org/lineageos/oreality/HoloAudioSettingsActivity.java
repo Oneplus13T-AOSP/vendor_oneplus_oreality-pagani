@@ -21,7 +21,7 @@ import android.preference.SwitchPreference;
  * of showing controls that cannot work.
  */
 @SuppressWarnings("deprecation")
-public final class HoloAudioSettingsActivity extends PreferenceActivity {
+public final class HoloAudioSettingsActivity extends EffectPreferenceActivity {
     private SwitchPreference mEnabled;
     private Preference mLevel;
     private Preference mPlacement;
@@ -75,9 +75,11 @@ public final class HoloAudioSettingsActivity extends PreferenceActivity {
         refresh();
     }
 
-    private void refresh() {
+    @Override
+    void refresh() {
         EffectService service = EffectService.peek();
         if (service == null) {
+            mEnabled.setEnabled(false);
             return;
         }
         boolean supported = service.isHoloSupported();
