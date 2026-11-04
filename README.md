@@ -4,9 +4,19 @@ ColorOS 17 pagani의 AudioX 엔진과 OPlus spatializer를 PixelOS Android 17에
 등록하는 vendor 트리입니다. 소스 제어 앱은 OReality 프로파일·10밴드 EQ와
 AOSP Spatializer를 통한 공간화 설정을 제공합니다.
 
-**전체 ROM 빌드·부팅·청취 검증은 미완료입니다.** Holo의 앱별 위치 지정 및
-스톡 앱 분류 서비스는 포함하지 않습니다. 기본 프로파일은 자동 장면 감지를
-의미하지 않습니다. 공간화 가능 여부는 AOSP의 재생 형식·출력 장치 정책에 따릅니다.
+**이 UI 변경본의 ROM 빌드·실기기 확인은 미완료입니다.** Holo의 앱별 위치 지정은
+포함하지 않습니다. 공간화 가능 여부는 AOSP의 재생 형식·출력 장치 정책에 따릅니다.
+
+OReality 화면은 13T 스톡의 신형 **스마트·몰입·고음질·사용자 지정** 4모드와
+원본 카드 이미지로 재구현했습니다. EQ는 원본 8개 프리셋과 ±6 dB 세로형
+10밴드이며, 사용자 지정 카드 오른쪽 아래 버튼으로 엽니다. 소리 및 진동 목록의
+설명도 이 구성에 맞췄습니다. COUI/스톡 Settings APK 전체를 실행하는 방식이 아닌
+AOSP 네이티브 UI 구현이므로 글꼴·블러 등 세부 렌더링은 ColorOS와 다를 수 있습니다.
+
+스마트 모드는 스톡 AudioEffectCenter의 앱 분류 목록과 AOSP 재생 콜백을 사용합니다.
+OPlus 전용 앱 감지·온라인 분류 업데이트 서비스는 포함하지 않으며, 미등록 앱은
+오디오 속성과 앱 카테고리로 분류합니다. 빠른 설정의 OReality 타일은 포트에 추가한
+기능으로, 새 빌드 설치 후 타일 편집 화면에서 직접 추가할 수 있습니다.
 
 ## 통합
 
@@ -76,9 +86,18 @@ Settings의 소리 및 진동에 두 항목을 넣습니다. persistent platform
 음량·장치·회전 및 공간화 출력 변경을 반영합니다. 화면은 비동기 서비스 연결과
 상태 알림을 통해 갱신됩니다.
 
-프로파일의 앱 저장 ID, 스톡 프로파일 ID, AudioX 슬롯은 서로 다릅니다.
-변환표와 EQ의 millibel → dB Q22 변환은 `EffectProtocol.java`에 있으며
-호스트 동작 테스트를 실행합니다. EQ를 켜면 Custom을 선택하며 다른 프로파일의
-튜닝을 EQ 이득으로 덮어쓰지 않습니다.
+앱의 모드 ID, 스톡의 재생 프로파일 ID, AudioX 슬롯은 서로 다릅니다.
+`StockAudioModes.java`가 스톡 신형 모드와 실제 프로파일을 변환하고,
+`EffectProtocol.java`는 EQ의 millibel → dB Q22 변환을 담당합니다.
+EQ 설정과 마지막 사용자 지정 값은 스피커/이어폰별로 보존합니다. 기존 음악·영화·게임
+선택은 각각 고음질·몰입·스마트로 이전하며 기존 데이터 삭제는 필요하지 않습니다.
+
+[스톡 UI 구현 근거와 검증 범위](docs/stock-ui.md)에 원본 파일, 프리셋 값, 호환성 및
+실기기에서 확인할 항목을 기록했습니다. 원본 그림과 분류 목록의 재현/검증은 다음으로 합니다.
+
+```sh
+python3 tools/import-stock-ui.py /path/to/pagani-dump
+python3 tools/import-stock-ui.py --verify-only
+```
 
 검토 근거, 검사 결과와 실기기 확인 항목은 [docs/validation.md](docs/validation.md)를 참고하세요.

@@ -45,20 +45,7 @@ final class AudioXEffect {
     private static final int PARAM_EQ_ENABLE = 0x100100c9;
 
     /** Number of graphic-EQ bands the engine accepts. */
-    static final int EQ_BANDS = 10;
-
-    /*
-     * Port preference ids. These are NOT stock profile ids or
-     * the values the engine receives: EffectProtocol translates them
-     * before writing PARAM_PROFILE.
-     */
-    static final int PROFILE_INTELLIGENCE = 0;
-    static final int PROFILE_MUSIC = 1;
-    static final int PROFILE_MOVIE = 2;
-    static final int PROFILE_GAME = 3;
-    static final int PROFILE_IMMERSION = 4;
-    static final int PROFILE_FIDELITY = 5;
-    static final int PROFILE_CUSTOM = 6;
+    static final int EQ_BANDS = EqualizerPresets.BANDS;
 
     private static final Method SET_PARAM_BYTES = findMethod("setParameter",
             int.class, byte[].class);
@@ -110,13 +97,9 @@ final class AudioXEffect {
         mEffect.release();
     }
 
-    /** Stock profile index, see the {@code PROFILE_*} constants. */
-    boolean setProfile(int profile) {
-        int engine = EffectProtocol.audioxProfile(profile);
-        if (engine < 0) {
-            return false;
-        }
-        return setInt(PARAM_PROFILE, engine);
+    boolean setStockProfile(int stockProfile) {
+        int slot = StockAudioModes.engineSlot(stockProfile);
+        return slot >= 0 && setInt(PARAM_PROFILE, slot);
     }
 
     /**

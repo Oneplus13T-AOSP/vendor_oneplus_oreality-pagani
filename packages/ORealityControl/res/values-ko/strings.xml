@@ -1,10 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2026 The LineageOS Project
-     SPDX-License-Identifier: Apache-2.0
--->
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="oreality_title">오리얼리티 오디오</string>
-    <string name="oreality_summary">음악·영화·게임 프로파일을 갖춘 원플러스 공간 음향</string>
+    <string name="oreality_summary">스마트·몰입·고음질 모드와 사용자 지정 이퀄라이저</string>
     <string name="oreality_keywords">오리얼리티, 오디오, 소리, 공간음향, 이퀄라이저, 원플러스</string>
     <string name="oreality_enable">오리얼리티 오디오 사용</string>
     <string name="oreality_enable_summary">원플러스 오디오 엔진을 미디어 재생에 적용합니다</string>
@@ -12,18 +9,16 @@
     <string name="oreality_equalizer">그래픽 이퀄라이저</string>
     <string name="oreality_equalizer_summary">사용자 프로파일의 10개 주파수 대역을 조정합니다</string>
     <string name="oreality_equalizer_bands">이퀄라이저</string>
-    <string name="oreality_equalizer_help">이득은 원플러스 오디오 엔진이 적용합니다. 스피커 튜닝 표는 현재 미디어 볼륨을 따릅니다.</string>
-    <string name="oreality_equalizer_reset">모든 대역 초기화</string>
+    <string name="oreality_equalizer_help">프리셋을 선택하거나 10개 대역을 조절하세요.</string>
+    <string name="oreality_equalizer_reset">초기화</string>
     <string name="oreality_unavailable">오디오 엔진이 변경을 적용하지 못했습니다</string>
-
     <string name="profile_music">음악</string>
     <string name="profile_movie">영화</string>
     <string name="profile_game">게임</string>
     <string name="profile_custom">사용자 지정</string>
-    <string name="profile_intelligence">기본</string>
+    <string name="profile_intelligence">스마트</string>
     <string name="profile_immersion">몰입</string>
     <string name="profile_fidelity">고음질</string>
-
     <string name="holo_title">홀로 오디오</string>
     <string name="holo_summary">OnePlus 공간 오디오 렌더링</string>
     <string name="holo_keywords">홀로, 오디오, 공간음향, 스피셜라이저, 원플러스</string>
@@ -37,4 +32,27 @@
     <string name="holo_placement_pending">이 포팅에 포함되지 않은 원플러스 메타오디오 서비스가 필요합니다</string>
     <string name="holo_placement_unavailable">사용할 수 없음: 원플러스 메타오디오 서비스가 설치되어 있지 않습니다</string>
     <string name="holo_unsupported">공간화 효과가 로드되지 않았습니다</string>
+    <string name="mode_smart_summary">재생 중인 앱과 콘텐츠에 맞춰 음향 효과를 자동으로 선택합니다.</string>
+    <string name="mode_immersion_summary">더 넓고 몰입감 있는 서라운드 사운드를 제공합니다.</string>
+    <string name="mode_fidelity_summary">선명하고 균형 잡힌 자연스러운 소리를 제공합니다.</string>
+    <string name="mode_custom_summary">EQ 프리셋을 선택하거나 10개 주파수 대역을 조절합니다.</string>
+    <string name="ui_back">뒤로</string>
+    <string name="ui_forward">›</string>
+    <string name="ui_selected_check">✓</string>
+    <string name="ui_select_mode">모드 선택</string>
+    <string name="eq_preset">이퀄라이저 프리셋</string>
+    <string name="eq_speaker">스피커 이퀄라이저</string>
+    <string name="eq_headphones">이어폰 이퀄라이저</string>
+    <string name="eq_bands_title">이퀄라이저 · dB</string>
+    <string name="eq_help_stock">각 대역을 −6~+6 dB로 조절합니다. 프리셋을 수정하면 사용자 지정으로 전환됩니다. 스피커와 이어폰 설정은 따로 저장됩니다.</string>
+    <string-array name="eq_preset_labels">
+        <item>사용자 지정</item>
+        <item>팝</item>
+        <item>락</item>
+        <item>일렉트로닉</item>
+        <item>클래식</item>
+        <item>보컬 강화</item>
+        <item>베이스 강화</item>
+        <item>고음 강화</item>
+    </string-array>
 </resources>

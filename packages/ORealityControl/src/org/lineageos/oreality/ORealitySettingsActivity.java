@@ -1,153 +1,146 @@
-/* Copyright (C) 2026 The LineageOS Project
- * SPDX-License-Identifier: Apache-2.0
- */
+/* SPDX-License-Identifier: Apache-2.0 */
 package org.lineageos.oreality;
 
+import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewOutlineProvider;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
 import com.oplus.oreality.audio.R;
 
-import android.content.Intent;
-import android.os.Bundle;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.PreferenceActivity;
-import android.preference.PreferenceScreen;
-import android.preference.SwitchPreference;
-import android.widget.Toast;
+/** pagani's renewed four-category screen with original ColorOS artwork. */
+public final class ORealitySettingsActivity extends EffectActivity {
+    private static final int[] MODES = {0, 4, 5, 6};
+    private static final int[] TITLES = {R.string.profile_intelligence, R.string.profile_immersion,
+            R.string.profile_fidelity, R.string.profile_custom};
+    private static final int[] DETAILS = {R.string.mode_smart_summary, R.string.mode_immersion_summary,
+            R.string.mode_fidelity_summary, R.string.mode_custom_summary};
+    private static final int[] IMAGES = {R.drawable.oreality_mode_intelligence_renewal,
+            R.drawable.oreality_mode_immersion_renewal, R.drawable.oreality_mode_fidelity_renewal,
+            R.drawable.oreality_mode_custom_renewal};
+    private final FrameLayout[] mFrames = new FrameLayout[4];
+    private final LinearLayout[] mCards = new LinearLayout[4];
+    private final TextView[] mChecks = new TextView[4];
+    private Switch mEnabled;
+    private ImageButton mCustomJump;
+    private boolean mRefreshing;
 
-/**
- * OReality Audio entry screen, launched from Settings &gt; Sound &amp; vibration.
- *
- * <p>Presents the same choices the stock OPlus control surface offers: on/off,
- * the profile (music, movie, game, custom) and the ten-band graphic equalizer
- * that belongs to the custom profile. Enable state is read from the effect;
- * the profile and EQ controls display the persisted selection.
- */
-@SuppressWarnings("deprecation")
-public final class ORealitySettingsActivity extends EffectPreferenceActivity {
-    private SwitchPreference mEnabled;
-    private ListPreference mProfile;
-    private SwitchPreference mEqualizer;
-    private Preference mBands;
-
-    @Override
-    public void onCreate(Bundle state) {
+    @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        setTitle(R.string.oreality_title);
-        EffectService.start(this);
-
-        PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(this);
-        setPreferenceScreen(screen);
-
-        mEnabled = new SwitchPreference(this);
-        mEnabled.setTitle(R.string.oreality_enable);
-        mEnabled.setSummary(R.string.oreality_enable_summary);
-        mEnabled.setPersistent(false);
-        mEnabled.setOnPreferenceChangeListener((preference, value) -> {
-            boolean wanted = (Boolean) value;
-            if (!mService().setRealityEnabled(wanted)) {
-                toast(R.string.oreality_unavailable);
+        LinearLayout body = content(R.string.oreality_title);
+        mEnabled = new Switch(this); mEnabled.setText(R.string.oreality_enable);
+        mEnabled.setTextSize(17); AudioUi.pad(mEnabled, 20, 18); AudioUi.surface(mEnabled);
+        mEnabled.setOnCheckedChangeListener((button, enabled) -> {
+            if (!mRefreshing && mService != null) {
+                if (!mService.setRealityEnabled(enabled)) unavailable(); refresh();
             }
-            refresh();
-            return false;
         });
-        screen.addPreference(mEnabled);
-
-        mProfile = new ListPreference(this);
-        mProfile.setTitle(R.string.oreality_profile);
-        mProfile.setPersistent(false);
-        mProfile.setEntries(new CharSequence[] {
-                getString(R.string.profile_intelligence), getString(R.string.profile_music),
-                getString(R.string.profile_movie), getString(R.string.profile_game),
-                getString(R.string.profile_immersion), getString(R.string.profile_fidelity),
-                getString(R.string.profile_custom)});
-        mProfile.setEntryValues(new CharSequence[] {
-                Integer.toString(AudioXEffect.PROFILE_INTELLIGENCE),
-                Integer.toString(AudioXEffect.PROFILE_MUSIC),
-                Integer.toString(AudioXEffect.PROFILE_MOVIE),
-                Integer.toString(AudioXEffect.PROFILE_GAME),
-                Integer.toString(AudioXEffect.PROFILE_IMMERSION),
-                Integer.toString(AudioXEffect.PROFILE_FIDELITY),
-                Integer.toString(AudioXEffect.PROFILE_CUSTOM)});
-        mProfile.setOnPreferenceChangeListener((preference, value) -> {
-            try {
-                mService().setProfile(Integer.parseInt((String) value));
-            } catch (NumberFormatException invalid) {
-                toast(R.string.oreality_unavailable);
+        body.addView(mEnabled, AudioUi.rowParams(this, 22));
+        TextView intro = AudioUi.text(this, R.string.oreality_summary, 14);
+        intro.setTextColor(AudioUi.secondary(this)); body.addView(intro, AudioUi.rowParams(this, 24));
+        TextView label = AudioUi.text(this, R.string.ui_select_mode, 16);
+        label.setTypeface(null, 1); body.addView(label, AudioUi.rowParams(this, 14));
+        for (int row = 0; row < 2; row++) {
+            LinearLayout pair = new LinearLayout(this);
+            for (int column = 0; column < 2; column++) {
+                int index = row * 2 + column;
+                LinearLayout card = card(index); mCards[index] = card;
+                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
+                if (column == 0) p.setMarginEnd(AudioUi.dp(this, 12));
+                pair.addView(card, p);
             }
-            refresh();
-            return false;
-        });
-        screen.addPreference(mProfile);
-
-        mEqualizer = new SwitchPreference(this);
-        mEqualizer.setTitle(R.string.oreality_equalizer);
-        mEqualizer.setSummary(R.string.oreality_equalizer_summary);
-        mEqualizer.setPersistent(false);
-        mEqualizer.setOnPreferenceChangeListener((preference, value) -> {
-            mService().setEqualizerEnabled((Boolean) value);
-            refresh();
-            return false;
-        });
-        screen.addPreference(mEqualizer);
-
-        mBands = new Preference(this);
-        mBands.setTitle(R.string.oreality_equalizer_bands);
-        mBands.setPersistent(false);
-        mBands.setOnPreferenceClickListener(preference -> {
-            startActivity(new Intent(this, EqualizerActivity.class));
-            return true;
-        });
-        screen.addPreference(mBands);
-
+            body.addView(pair, AudioUi.rowParams(this, 18));
+        }
         refresh();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        EffectService.start(this);
-        refresh();
-    }
-
-    private EffectService mService() {
-        return EffectService.peek();
-    }
-
-    @Override
-    void refresh() {
-        EffectService service = EffectService.peek();
-        if (service == null) {
-            mEnabled.setEnabled(false);
-            mProfile.setEnabled(false);
-            mEqualizer.setEnabled(false);
-            mBands.setEnabled(false);
-            return;
-        }
-        boolean present = service.isRealityPresent();
-        boolean enabled = service.isRealityEnabled();
-        mEnabled.setChecked(enabled);
-        mEnabled.setEnabled(present);
-        mProfile.setEnabled(present);
-        mProfile.setValue(Integer.toString(service.getProfile()));
-        mProfile.setSummary(mProfile.getEntry());
-        mEqualizer.setChecked(service.isEqualizerEnabled());
-        mEqualizer.setEnabled(present);
-        mBands.setEnabled(present && service.isEqualizerEnabled());
-        mBands.setSummary(buildBandSummary(service.getEqualizerGains()));
-    }
-
-    private String buildBandSummary(int[] gains) {
-        StringBuilder builder = new StringBuilder();
-        for (int band = 0; band < gains.length; band++) {
-            if (band > 0) {
-                builder.append("  ");
+    private LinearLayout card(int index) {
+        LinearLayout outer = AudioUi.column(this);
+        outer.setFocusable(true); outer.setClickable(true);
+        outer.setContentDescription(getString(TITLES[index]) + ". " + getString(DETAILS[index]));
+        outer.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setClassName("android.widget.RadioButton"); info.setCheckable(true);
+                info.setChecked(host.isSelected());
             }
-            builder.append(String.format(java.util.Locale.US, "%+.1f", gains[band] / 100.0f));
+        });
+        FrameLayout frame = new FrameLayout(this); mFrames[index] = frame;
+        frame.setPadding(AudioUi.dp(this, 3), AudioUi.dp(this, 3), AudioUi.dp(this, 3), AudioUi.dp(this, 3));
+        frame.setClipToOutline(true); frame.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        ImageView art = new ImageView(this) {
+            @Override protected void onMeasure(int widthSpec, int heightSpec) {
+                int width = MeasureSpec.getSize(widthSpec);
+                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(Math.round(width * 759f / 1200f), MeasureSpec.EXACTLY));
+            }
+        };
+        art.setImageResource(IMAGES[index]); art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        art.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        frame.addView(art, new FrameLayout.LayoutParams(-1, -2));
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
+                new int[]{0x99000000, Color.TRANSPARENT}));
+        FrameLayout.LayoutParams shadeParams = new FrameLayout.LayoutParams(-1, AudioUi.dp(this, 54), Gravity.BOTTOM);
+        frame.addView(shade, shadeParams);
+        TextView title = AudioUi.text(this, TITLES[index], 12); title.setTextColor(Color.WHITE);
+        AudioUi.pad(title, 12, 10);
+        frame.addView(title, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        TextView check = AudioUi.text(this, R.string.ui_selected_check, 14); mChecks[index] = check;
+        check.setGravity(Gravity.CENTER); check.setTextColor(Color.WHITE);
+        check.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        check.setBackground(AudioUi.rounded(this, AudioUi.accent(this), Color.TRANSPARENT));
+        FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(AudioUi.dp(this, 24), AudioUi.dp(this, 24), Gravity.TOP | Gravity.END);
+        cp.setMargins(0, AudioUi.dp(this, 9), AudioUi.dp(this, 9), 0); frame.addView(check, cp);
+        if (MODES[index] == StockAudioModes.CUSTOM) {
+            mCustomJump = new ImageButton(this); mCustomJump.setImageResource(R.drawable.ic_tune);
+            mCustomJump.setContentDescription(getString(R.string.oreality_equalizer_bands));
+            mCustomJump.setBackgroundColor(Color.TRANSPARENT);
+            FrameLayout.LayoutParams jump = new FrameLayout.LayoutParams(AudioUi.dp(this, 44),
+                    AudioUi.dp(this, 44), Gravity.BOTTOM | Gravity.END);
+            frame.addView(mCustomJump, jump);
+            mCustomJump.setOnClickListener(v -> {
+                if (mService != null && mService.isRealityEnabled()) {
+                    if (!mService.setProfile(StockAudioModes.CUSTOM)) { unavailable(); return; }
+                    startActivity(new Intent(this, EqualizerActivity.class));
+                }
+            });
         }
-        return builder.toString();
+        outer.addView(frame, new LinearLayout.LayoutParams(-1, -2));
+        TextView detail = AudioUi.text(this, DETAILS[index], 12); detail.setTextColor(AudioUi.secondary(this));
+        detail.setPadding(AudioUi.dp(this, 3), AudioUi.dp(this, 8), 0, 0); outer.addView(detail);
+        outer.setOnClickListener(v -> {
+            if (mService != null) { if (!mService.setProfile(MODES[index])) unavailable(); refresh(); }
+        });
+        return outer;
     }
 
-    private void toast(int resId) {
-        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show();
+    private void unavailable() { Toast.makeText(this, R.string.oreality_unavailable, Toast.LENGTH_SHORT).show(); }
+
+    @Override void refresh() {
+        if (mEnabled == null) return;
+        boolean present = mService != null && mService.isRealityPresent();
+        boolean enabled = present && mService.isRealityEnabled();
+        int mode = mService == null ? new Prefs(this).getProfile() : mService.getProfile();
+        mRefreshing = true; mEnabled.setChecked(enabled); mEnabled.setEnabled(present); mRefreshing = false;
+        for (int i = 0; i < MODES.length; i++) {
+            boolean selected = mode == MODES[i];
+            mFrames[i].setBackground(AudioUi.rounded(this, AudioUi.surface(this),
+                    selected ? AudioUi.accent(this) : Color.TRANSPARENT));
+            mChecks[i].setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            mCards[i].setSelected(selected); mCards[i].setEnabled(enabled);
+            mCards[i].setAlpha(enabled ? 1f : .45f);
+        }
+        mCustomJump.setEnabled(enabled);
     }
 }

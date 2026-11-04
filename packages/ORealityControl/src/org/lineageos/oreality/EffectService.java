@@ -21,6 +21,8 @@ import android.util.Log;
 import android.view.Display;
 
 import java.util.ArrayList;
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 
 /**
  * Persistent owner of the OReality and Holo Audio effects.
@@ -43,6 +45,7 @@ public final class EffectService extends Service {
     private Prefs mPrefs;
     private AudioXEffect mAudioX;
     private HoloAudioEffect mHolo;
+    private SceneMonitor mScenes;
     private AudioManager mAudioManager;
     private DisplayManager mDisplayManager;
     private boolean mServerReady;
@@ -50,11 +53,19 @@ public final class EffectService extends Service {
     private int mRetries;
     private boolean mRestoreHoloState = true;
     private final ArrayList<Runnable> mListeners = new ArrayList<>();
+    private int mLastTileState = -1;
+    private int mObservedRotation = -1;
 
     void addListener(Runnable listener) { mListeners.add(listener); }
     void removeListener(Runnable listener) { mListeners.remove(listener); }
     private void notifyListeners() {
         for (Runnable listener : new ArrayList<>(mListeners)) listener.run();
+        int state = !isRealityPresent() ? 0 : (isRealityEnabled() ? 2 : 1);
+        if (state != mLastTileState) {
+            mLastTileState = state;
+            android.service.quicksettings.TileService.requestListeningState(this,
+                    new android.content.ComponentName(this, ORealityTileService.class));
+        }
     }
     private final Runnable mRetry = () -> rebind(false);
 
@@ -84,9 +95,9 @@ public final class EffectService extends Service {
     };
     private final DisplayManager.DisplayListener mDisplayListener =
             new DisplayManager.DisplayListener() {
-        @Override public void onDisplayAdded(int id) { updateHoloParameters(); }
-        @Override public void onDisplayRemoved(int id) { updateHoloParameters(); }
-        @Override public void onDisplayChanged(int id) { updateHoloParameters(); }
+        @Override public void onDisplayAdded(int id) { onRotationChanged(id); }
+        @Override public void onDisplayRemoved(int id) { onRotationChanged(id); }
+        @Override public void onDisplayChanged(int id) { onRotationChanged(id); }
     };
     private final Spatializer.OnSpatializerStateChangedListener mSpatializerListener =
             new Spatializer.OnSpatializerStateChangedListener() {
@@ -134,6 +145,7 @@ public final class EffectService extends Service {
         registerReceiver(mVolumeReceiver, new IntentFilter(AudioManager.ACTION_VOLUME_CHANGED),
                 Context.RECEIVER_NOT_EXPORTED);
         mServerReady = mAudioManager.isAudioServerRunning();
+        mScenes = new SceneMonitor(this, mHandler, () -> applyState());
         rebind(false);
     }
 
@@ -151,6 +163,7 @@ public final class EffectService extends Service {
         mAudioManager.unregisterAudioDeviceCallback(mDeviceCallback);
         if (mDisplayManager != null) mDisplayManager.unregisterDisplayListener(mDisplayListener);
         mHolo.removeStateListener(mSpatializerListener);
+        mScenes.close();
         unregisterReceiver(mVolumeReceiver);
         releaseAudioX();
         mHandler.removeCallbacksAndMessages(null);
@@ -170,6 +183,7 @@ public final class EffectService extends Service {
     void rebind(boolean force) {
         if (mDestroyed || !mServerReady) return;
         if (force) releaseAudioX();
+        if (mScenes != null) mScenes.update();
         if (mAudioX == null) {
             try {
                 mAudioX = new AudioXEffect(1);
@@ -198,11 +212,10 @@ public final class EffectService extends Service {
             if (mAudioX != null && mAudioX.hasControl()) {
                 accepted = mAudioX.setEnabled(mPrefs.isRealityEnabled())
                         == android.media.audiofx.AudioEffect.SUCCESS;
-                accepted &= mAudioX.setProfile(mPrefs.getProfile());
+                accepted &= mAudioX.setStockProfile(resolvedProfile());
                 accepted &= mAudioX.setVolumeIndex(mHolo.getMusicVolumeIndex());
-                accepted &= mAudioX.setEqualizer(mPrefs.isEqualizerEnabled()
-                                && mPrefs.getProfile() == AudioXEffect.PROFILE_CUSTOM,
-                        mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains());
+                accepted &= mAudioX.setEqualizer(mPrefs.getProfile() == StockAudioModes.CUSTOM,
+                        mHolo.getMusicVolumeIndex(), mPrefs.getEqualizerGains(isHeadphoneRoute()));
             }
         } catch (RuntimeException unavailable) {
             Log.w(TAG, "AudioX handle is unavailable", unavailable);
@@ -230,7 +243,7 @@ public final class EffectService extends Service {
     private void updateHoloParameters() {
         if (mDestroyed || !mServerReady) return;
         try {
-            mHolo.setProfile(mPrefs.getProfile());
+            mHolo.setStockProfile(resolvedProfile());
             mHolo.setVolumeIndex(mHolo.getMusicVolumeIndex());
             Display display = mDisplayManager == null ? null
                     : mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
@@ -270,8 +283,9 @@ public final class EffectService extends Service {
     }
 
     boolean setProfile(int profile) {
-        if (EffectProtocol.audioxProfile(profile) < 0) return false;
+        if (profile != StockAudioModes.migrate(profile)) return false;
         mPrefs.setProfile(profile);
+        if (profile == StockAudioModes.CUSTOM) mPrefs.setEqualizerEnabled(true);
         return applyState();
     }
 
@@ -281,7 +295,7 @@ public final class EffectService extends Service {
 
     boolean setEqualizerEnabled(boolean enabled) {
         mPrefs.setEqualizerEnabled(enabled);
-        if (enabled) mPrefs.setProfile(AudioXEffect.PROFILE_CUSTOM);
+        if (enabled) mPrefs.setProfile(StockAudioModes.CUSTOM);
         return pushEqualizer();
     }
 
@@ -290,12 +304,41 @@ public final class EffectService extends Service {
     }
 
     boolean setEqualizerGains(int[] gains) {
-        mPrefs.setEqualizerGains(gains);
+        mPrefs.setEqualizerGains(isHeadphoneRoute(), gains);
         return pushEqualizer();
     }
 
     int[] getEqualizerGains() {
-        return mPrefs.getEqualizerGains();
+        return mPrefs.getEqualizerGains(isHeadphoneRoute());
+    }
+
+    int getEqualizerPreset() { return mPrefs.getEqualizerPreset(isHeadphoneRoute()); }
+
+    boolean setEqualizerPreset(int preset) {
+        if (!EqualizerPresets.isValid(preset)) return false;
+        mPrefs.setEqualizerPreset(isHeadphoneRoute(), preset);
+        mPrefs.setEqualizerEnabled(true);
+        mPrefs.setProfile(StockAudioModes.CUSTOM);
+        return applyState();
+    }
+
+    boolean isHeadphoneRoute() { return mScenes != null && mScenes.headphones(); }
+
+    private void onRotationChanged(int displayId) {
+        if (displayId != Display.DEFAULT_DISPLAY) return;
+        Display display = mDisplayManager == null ? null
+                : mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        int rotation = display == null ? 0 : display.getRotation();
+        // Display events also include brightness/refresh-rate changes on LTPO panels.
+        if (rotation != mObservedRotation) { mObservedRotation = rotation; applyState(); }
+    }
+
+    private int resolvedProfile() {
+        Display display = mDisplayManager == null ? null
+                : mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        return StockAudioModes.resolve(mPrefs.getProfile(),
+                mScenes == null ? 0 : mScenes.scene(), isHeadphoneRoute(),
+                display == null ? 0 : display.getRotation());
     }
 
     private boolean pushEqualizer() {
@@ -330,4 +373,16 @@ public final class EffectService extends Service {
     String describeHoloLevel() {
         return mHolo.describeImmersiveLevel();
     }
+    @Override protected void dump(FileDescriptor fd, PrintWriter out, String[] args) {
+        // Read-only evidence. Saved parameters below are desired state, not native readback.
+        out.println("selectedMode=" + mPrefs.getProfile());
+        int profile = resolvedProfile();
+        out.println("resolvedStockProfile=" + profile + " audioxSlot=" + StockAudioModes.engineSlot(profile));
+        out.println("scene=" + (mScenes == null ? 0 : mScenes.scene()) + " headphones=" + isHeadphoneRoute());
+        out.println("audioxPresent=" + isRealityPresent() + " enabled=" + isRealityEnabled());
+        out.println("desiredEqPreset=" + getEqualizerPreset());
+        out.println("desiredEqMillibels=" + java.util.Arrays.toString(getEqualizerGains()));
+        out.println("holoSupported=" + mHolo.isSupported() + " enabled=" + mHolo.isEnabled());
+    }
+
 }

@@ -401,14 +401,20 @@ def check_profile_mapping() -> None:
     test = REPO / "tools/tests/EffectProtocolTest.java"
     try:
         with tempfile.TemporaryDirectory(prefix="oreality-protocol-") as temp:
-            subprocess.run(["javac", "-d", temp, str(source), str(test)], check=True,
+            java = source.parent
+            sources = [source, test, java / "StockAudioModes.java", java / "EqualizerPresets.java",
+                       java / "Prefs.java", REPO / "tools/tests/StockModesTest.java",
+                       REPO / "tools/tests/PrefsTest.java"]
+            sources.extend((REPO / "tools/tests/fakes").rglob("*.java"))
+            subprocess.run(["javac", "-d", temp, *map(str, sources)], check=True,
                            capture_output=True, text=True)
-            subprocess.run(["java", "-cp", temp, "org.lineageos.oreality.EffectProtocolTest"],
-                           check=True, capture_output=True, text=True)
+            for name in ("EffectProtocolTest", "StockModesTest", "PrefsTest"):
+                subprocess.run(["java", "-cp", temp, "org.lineageos.oreality." + name],
+                               check=True, capture_output=True, text=True)
     except (OSError, subprocess.CalledProcessError) as error:
         fail(f"protocol regression failed: {error} {getattr(error, 'stderr', '')}")
         return
-    print("  profile and Q22 behavior verified")
+    print("  profile/scene, preset/migration and Q22 behavior verified")
 
 
 def check_components() -> None:
@@ -441,6 +447,27 @@ def check_properties(rom_root: Path) -> None:
     print("  properties verified")
 
 
+def check_stock_ui() -> None:
+    result = subprocess.run([sys.executable, str(REPO / "tools/import-stock-ui.py"), "--verify-only"],
+                            capture_output=True, text=True)
+    if result.returncode:
+        fail("stock UI assets/catalog mismatch: " + result.stdout + result.stderr)
+    root = ET.parse(REPO / "packages/ORealityControl/AndroidManifest.xml").getroot()
+    ns = "{http://schemas.android.com/apk/res/android}"
+    tile = next((node for node in root.iter("service")
+                 if node.get(ns + "name") == "org.lineageos.oreality.ORealityTileService"), None)
+    if tile is None or tile.get(ns + "permission") != "android.permission.BIND_QUICK_SETTINGS_TILE":
+        fail("OReality QS entry must be protected by BIND_QUICK_SETTINGS_TILE")
+    elif tile.get(ns + "exported") != "true":
+        fail("SystemUI cannot bind an unexported tile service")
+    for locale in ("values", "values-ko"):
+        values = ET.parse(REPO / f"packages/ORealityControl/res/{locale}/strings.xml").getroot()
+        presets = values.find("string-array[@name='eq_preset_labels']")
+        if presets is None or len(presets) != 8:
+            fail(f"{locale} must have the eight stock EQ preset labels")
+    print("  stock UI assets, preset labels and QS service protection verified")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rom-root", default="/home/ccc/android/pixelos",
@@ -466,6 +493,7 @@ def main() -> int:
     check_components()
     check_profile_mapping()
     check_properties(rom_root)
+    check_stock_ui()
     command = [sys.executable, str(REPO / "tools/check-integration.py"),
                "--rom-root", str(rom_root), "--device-tree",
                str(args.pagani_device_tree or rom_root / "device/oneplus/pagani")]

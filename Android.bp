@@ -89,6 +89,7 @@ android_app {
 
     srcs: ["packages/ORealityControl/src/**/*.java"],
     resource_dirs: ["packages/ORealityControl/res"],
+    asset_dirs: ["packages/ORealityControl/assets"],
     manifest: "packages/ORealityControl/AndroidManifest.xml",
 
     certificate: "platform",

@@ -81,14 +81,10 @@ final class HoloAudioEffect {
         }
     }
 
-    /** Stock spatializer profile id, or -1 when it cannot be read. */
-    int getProfile() {
-        return getInt(PARAM_PROFILE);
-    }
-
-    boolean setProfile(int profile) {
-        int stock = EffectProtocol.spatializerProfile(profile);
-        return stock >= 0 && setInt(PARAM_PROFILE, stock);
+    boolean setStockProfile(int profile) {
+        // Stock spatializer accepts 0..5; AudioX's video variants have no Holo equivalent.
+        int standard = StockAudioModes.spatializerProfile(profile);
+        return standard >= 0 && setInt(PARAM_PROFILE, standard);
     }
 
     /** Volume index used to pick the speaker tuning table. */

@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -28,10 +29,15 @@
         <!-- Settings > Sound & vibration: OReality Audio. -->
         <activity
             android:name="org.lineageos.oreality.ORealitySettingsActivity"
+            android:theme="@style/ORealityTheme"
             android:exported="true"
             android:label="@string/oreality_title">
             <intent-filter>
                 <action android:name="com.android.settings.action.IA_SETTINGS" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
                 android:name="com.android.settings.category"
@@ -86,8 +92,21 @@
 
         <activity
             android:name="org.lineageos.oreality.EqualizerActivity"
+            android:theme="@style/ORealityTheme"
             android:exported="false"
             android:label="@string/oreality_equalizer_bands" />
+
+        <service
+            android:name="org.lineageos.oreality.ORealityTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_oreality"
+            android:label="@string/oreality_title"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true" />
+        </service>
 
         <!-- Persistent owner of both AudioEffect handles. -->
         <service

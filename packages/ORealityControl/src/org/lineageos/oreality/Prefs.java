@@ -5,7 +5,6 @@ package org.lineageos.oreality;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.SystemProperties;
 
 /**
  * Persistent, per-user settings for both audio features.
@@ -24,7 +23,7 @@ final class Prefs {
     private static final String KEY_EQ_GAINS = "eq_gains";
     private static final String KEY_HOLO_ENABLED = "holo_enabled";
 
-    static final int DEFAULT_PROFILE = AudioXEffect.PROFILE_MUSIC;
+    static final int DEFAULT_PROFILE = StockAudioModes.SMART;
     private final SharedPreferences mPrefs;
 
     Prefs(Context context) {
@@ -43,7 +42,7 @@ final class Prefs {
 
     int getProfile() {
         int profile = mPrefs.getInt(KEY_OREALITY_PROFILE, DEFAULT_PROFILE);
-        return EffectProtocol.audioxProfile(profile) >= 0 ? profile : DEFAULT_PROFILE;
+        return StockAudioModes.migrate(profile);
     }
 
     void setProfile(int profile) {
@@ -58,9 +57,27 @@ final class Prefs {
         mPrefs.edit().putBoolean(KEY_EQ_ENABLED, enabled).apply();
     }
 
-    int[] getEqualizerGains() {
-        String stored = mPrefs.getString(KEY_EQ_GAINS, null);
-        int[] gains = new int[AudioXEffect.EQ_BANDS];
+    private static String routeKey(String base, boolean headphones) {
+        return base + (headphones ? "_headphones" : "_speaker");
+    }
+
+    int getEqualizerPreset(boolean headphones) {
+        int id = mPrefs.getInt(routeKey("eq_preset", headphones), 0);
+        return EqualizerPresets.isValid(id) ? id : 0;
+    }
+
+    void setEqualizerPreset(boolean headphones, int preset) {
+        if (EqualizerPresets.isValid(preset)) {
+            mPrefs.edit().putInt(routeKey("eq_preset", headphones), preset).apply();
+        }
+    }
+
+    int[] getEqualizerGains(boolean headphones) {
+        int preset = getEqualizerPreset(headphones);
+        if (preset != 0) return EqualizerPresets.gains(preset);
+        String stored = mPrefs.getString(routeKey(KEY_EQ_GAINS, headphones),
+                mPrefs.getString(KEY_EQ_GAINS, null));
+        int[] gains = new int[EqualizerPresets.BANDS];
         if (stored == null || stored.isEmpty()) {
             return gains;
         }
@@ -70,16 +87,16 @@ final class Prefs {
         }
         try {
             for (int band = 0; band < gains.length; band++) {
-                gains[band] = Math.max(-1200, Math.min(1200, Integer.parseInt(parts[band].trim())));
+                gains[band] = Math.max(-600, Math.min(600, Integer.parseInt(parts[band].trim())));
             }
         } catch (NumberFormatException invalid) {
-            return new int[AudioXEffect.EQ_BANDS];
+            return new int[EqualizerPresets.BANDS];
         }
         return gains;
     }
 
-    void setEqualizerGains(int[] gains) {
-        if (gains == null || gains.length != AudioXEffect.EQ_BANDS) {
+    void setEqualizerGains(boolean headphones, int[] gains) {
+        if (gains == null || gains.length != EqualizerPresets.BANDS) {
             return;
         }
         StringBuilder builder = new StringBuilder();
@@ -87,9 +104,10 @@ final class Prefs {
             if (band > 0) {
                 builder.append(',');
             }
-            builder.append(gains[band]);
+            builder.append(Math.max(-600, Math.min(600, gains[band])));
         }
-        mPrefs.edit().putString(KEY_EQ_GAINS, builder.toString()).apply();
+        mPrefs.edit().putString(routeKey(KEY_EQ_GAINS, headphones), builder.toString())
+                .putInt(routeKey("eq_preset", headphones), 0).apply();
     }
 
     boolean isHoloEnabled() {
@@ -100,8 +118,4 @@ final class Prefs {
         mPrefs.edit().putBoolean(KEY_HOLO_ENABLED, enabled).apply();
     }
 
-    /** Whether the stock effect engine reports itself as available. */
-    static boolean isEffectDeclared() {
-        return SystemProperties.get("ro.oplus.audio.effect.type", "").equals("audiox_merge");
-    }
 }
