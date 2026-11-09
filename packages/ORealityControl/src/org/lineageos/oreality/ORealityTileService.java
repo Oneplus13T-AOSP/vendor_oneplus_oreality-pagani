@@ -28,10 +28,13 @@ public final class ORealityTileService extends TileService {
     @Override public void onStopListening() { mListening = false; if (!mPendingToggle) disconnect(); }
     @Override public void onDestroy() { disconnect(); super.onDestroy(); }
     @Override public void onClick() {
-        unlockAndRun(() -> {
-            if (mService != null) toggle();
-            else { mPendingToggle = !mPendingToggle; connect(); }
-        });
+        // Avoid a SystemUI/keyguard round trip (and shade dismissal) when unlocked.
+        if (isLocked()) unlockAndRun(this::clickUnlocked);
+        else clickUnlocked();
+    }
+    private void clickUnlocked() {
+        if (service() != null) toggle();
+        else { mPendingToggle = !mPendingToggle; connect(); }
     }
     private void connect() {
         if (mBound) return;
@@ -45,17 +48,28 @@ public final class ORealityTileService extends TileService {
         mBound = false;
     }
     private void toggle() {
-        if (mService != null && mService.isRealityPresent()) {
-            mService.setRealityEnabled(!mService.isRealityEnabled());
+        EffectService service = service();
+        if (service != null && service.isRealityPresent()) {
+            service.setRealityEnabled(!service.isRealityEnabled());
         }
         update();
+    }
+    private EffectService service() {
+        // Both services run in this persistent app process. A stopped QS listening
+        // session only drops our binding; it does not remove the effect owner.
+        return mService != null ? mService : EffectService.peek();
     }
     private void update() {
         Tile tile = getQsTile();
         if (tile == null) return;
-        boolean present = mService != null && mService.isRealityPresent();
+        EffectService service = service();
+        // Binding is asynchronous. Publishing UNAVAILABLE here can leave an active
+        // tile cached in state 0, which SystemUI refuses to click. Wait for the
+        // connection before reporting actual engine availability.
+        if (service == null) return;
+        boolean present = service.isRealityPresent();
         tile.setState(!present ? Tile.STATE_UNAVAILABLE :
-                (mService.isRealityEnabled() ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE));
+                (service.isRealityEnabled() ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE));
         tile.setLabel(getString(R.string.oreality_title));
         tile.setContentDescription(getString(R.string.oreality_title));
         tile.updateTile();

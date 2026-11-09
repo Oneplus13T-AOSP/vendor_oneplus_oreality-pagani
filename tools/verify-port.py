@@ -417,6 +417,15 @@ def check_profile_mapping() -> None:
     print("  profile/scene, preset/migration and Q22 behavior verified")
 
 
+def check_tile_lifecycle() -> None:
+    result = subprocess.run([sys.executable, str(REPO / 'tools/tests/test_tile.py')],
+                            capture_output=True, text=True)
+    if result.returncode:
+        fail(f"QS tile lifecycle regression failed: {result.stdout} {result.stderr}")
+    else:
+        print("  QS deferred binding, toggles and keyguard behavior verified")
+
+
 def check_components() -> None:
     root = ET.parse(REPO / "packages/ORealityControl/AndroidManifest.xml").getroot()
     ns = "{http://schemas.android.com/apk/res/android}"
@@ -492,6 +501,7 @@ def main() -> int:
     check_settings_entry()
     check_components()
     check_profile_mapping()
+    check_tile_lifecycle()
     check_properties(rom_root)
     check_stock_ui()
     command = [sys.executable, str(REPO / "tools/check-integration.py"),
