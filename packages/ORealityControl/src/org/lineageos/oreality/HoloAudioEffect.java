@@ -151,11 +151,7 @@ final class HoloAudioEffect {
         }
         int index = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         int max = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        // The stock service divides by ten on devices that report a 0..100 scale.
-        if (max > 100) {
-            index /= 10;
-        }
-        return Math.max(0, Math.min(16, index));
+        return EffectProtocol.volumeIndex(index, max);
     }
 
     private int getInt(int key) {
